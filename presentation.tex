@@ -87,8 +87,8 @@ Decentralized:
 \end{itemize}
 \bigskip
 
-Some of these are simply re-packaging of existing concepts in a 
-in a decentralized context. Here, the \textbf{permissionless} and 
+Some of these are simply re-packaging of existing concepts in a
+in a decentralized context. Here, the \textbf{permissionless} and
 \textbf{ACID} properties can sometimes come very handy.
 \end{frame}
 
@@ -123,7 +123,7 @@ in a decentralized context. Here, the \textbf{permissionless} and
 \begin{itemize}
     \item \textbf{Execution layer} -- executes the code of smart contracts as triggered by
         transactions. Performed by the EVM
-    \item \textbf{Consensus layer} -- ensures all nodes agree on the state of the blockchain. 
+    \item \textbf{Consensus layer} -- ensures all nodes agree on the state of the blockchain.
         Currently managed via proof-of-stake.
     \item \textbf{Data Availability Layer} --  ensures that transaction data is
         available (e.g. via data availability sampling)
@@ -136,21 +136,25 @@ The execution layer is the most important for us, as it is where the smart
 contracts are executed.
 \end{frame}
 
-\section{The EVM}
-\begin{frame}{What is the EVM?}
-The Ethereum Virtual Machine (EVM) is the \textbf{execution environment} for
-smart contracts on Ethereum. It is:
+
+\section{EVM}
+
+\begin{frame}{EVM}
 \begin{itemize}
-    \item \textbf{stack machine} -- instead of registers, it uses a stack
-    \item \textbf{bytecode-based} -- it executes bytecode instructions
-    \item \textbf{deterministic} -- it produces the same result for the same input \& state
-    \item \textbf{isolated} -- it runs in a sandboxed environment
-    \item \textbf{gas-based} -- it charges for execution based on gas consumption
-    \item \textbf{ACID-compliant} -- it provides atomicity, consistency, isolation, and durability
+    \item stack machine -- instead of registers, it uses a stack
+    \item Everything is 256b by default, addresses are 160b
+    \item No undefined behaviour
+    \item No IO. No printing, disk, networking, etc.
+    \item Only has a few regions for data: returndata, calldata, memory, storage, (stack)
+    \item No pointers. One contiguous memory, calldata, and returndata region
+    \item No such thing as infinite loops: gas is a unit of execution that is always limited
+    \item No such thing as huge memory/storage usage: gas also limits memory and storage
+    \item Can call other contracts, allowing for composability
+    \item ACID-compliant -- provides atomicity, consistency, isolation, and durability
 \end{itemize}
 \bigskip
-The EVM is the heart of Ethereum, as it executes the code of smart contracts and
-manages the state of the blockchain.
+
+The EVM executes the code of smart contracts and manages the state of the blockchain.
 \end{frame}
 
 \begin{frame}{EVM Instructions Overview}
@@ -217,7 +221,7 @@ blockchain. These instructions are divided into several categories:
 \begin{itemize}
     \item Block Context: \texttt{COINBASE}, \texttt{TIMESTAMP}, \texttt{NUMBER},
         \texttt{PREVRANDAO},
-        \texttt{ADDRESS}, \texttt{BALANCE}, \texttt{ORIGIN},  \texttt{CALLER}, 
+        \texttt{ADDRESS}, \texttt{BALANCE}, \texttt{ORIGIN},  \texttt{CALLER},
         \texttt{BLOCKHASH}, \texttt{DIFFICULTY}, \texttt{BLOBHASH}, \texttt{BLOBBASEFEE}, \texttt{CHAINID}
     \item Gas: \texttt{GAS}, \texttt{GASLIMIT}, \texttt{GASPRICE}
     \item Contract information: \texttt{EXTCODESIZE}, \texttt{EXTCODEHASH}, \texttt{MSIZE}
@@ -228,7 +232,9 @@ blockchain. These instructions are divided into several categories:
 
 
 \begin{frame}{ABI}
-The Application Binary Interface (ABI) is the interface between smart contracts and external applications. It defines how to encode and decode data for function calls, events, and errors.
+The Application Binary Interface (ABI) is the interface between smart contracts
+and external applications. It defines how to encode and decode data for
+function calls, events, and errors.
 \bigskip
 
 The ABI is used to:
@@ -297,11 +303,11 @@ if (!success) {
 \begin{frame}{Programming the EVM}
 We use Solidity to program the EVM, with YUL inline assembly:
 \begin{itemize}
-    \item \textbf{Imperative}, high-level language -– Code is executed step-by-step with explicit control flow (like C++).
+    \item \textbf{Imperative}, high-level language -– Code is executed step-by-step (like C++).
     \item \textbf{Statically typed} -- Variable types must be declared at compile time (e.g., uint, string).
-    \item \textbf{Object-oriented} -- Supports contracts (similar to classes), inheritance, interfaces, and libraries.
-    \item \textbf{Smart contract focus -- Designed for writing decentralized apps (dApps)
-    \item \textbf{Special features -- Built-in globals (e.g., msg.sender, block.timestamp), gas management, etc.
+    \item \textbf{Object-oriented} -- Supports contracts ($\approx$classes), inheritance, interfaces, and libraries.
+    \item \textbf{Smart contract focus} -- Designed for writing decentralized apps (dApps)
+    \item \textbf{Special features} -- Built-in globals (e.g., msg.sender), ABI en\&decoding
 \end{itemize}
 \bigskip
 
@@ -309,39 +315,124 @@ We use Solidity to program the EVM, with YUL inline assembly:
 \end{frame}
 
 
+\begin{frame}[fragile=singleslide]{Solidity: Special Functions: constructor, receive, fallback}
+You can define special functions in Solidity that will be called when
+the contract is \textbf{created},
+when the contract \textbf{receives Ether} without a function call,
+or when a \textbf{function is not found},
+
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+interface RemoteContract {
+    function withdraw() external;
+}
+contract Attacker{
+    RemoteContract remote;
+    uint receives = 0;
+    uint fallbacks = 0;
+
+    constructor(address addr) { remote = RemoteContract(addr); }
+    receive() external payable { receives++; }
+    fallback() external { fallbacks++; }
+}
+\end{Verbatim}
+\end{frame}
+
+
+\begin{frame}{Solidity: Special Functions: constructor, receive, fallback -- part 2}
+Who sees the issues with this?
+\pause
+\bigskip
+
+\textbf{Can't just send Ether to the contract, it might take control of execution}
+\begin{itemize}
+    \item It might call us back! Reentrancy attack.
+    \item It might call other contracts we rely on, changing their state
+    \item It might manipulate the cost of some asset whose price we already calculated/saved
+\end{itemize}
+\bigskip
+
+All calls\&transfers to external contracts require \textbf{careful consideration}.
+\end{frame}
+
 \begin{frame}{Online development envorinment: Remix}
 Built-in:
 \begin{itemize}
     \item Solidity compiler
-    \item EVM simulator
+    \item Test deployment environment
     \item Debugger
-    \item Static analysis tools
-    \item Unit testing framework
+    \item Unit testing
+    \item GitHub integration
 \end{itemize}
-\url{https://https://remix.ethereum.org/}
+\bigskip
+
+Remix URL: \url{https://https://remix.ethereum.org/}
+
+Simple project: \url{https://github.com/msooseth/remix-example}
+
+\end{frame}
+
+\begin{frame}{Remix: The DAO Hack}
+The DAO hack (in 2016) was a major event in Ethereum's history, where an attacker
+exploited a reentrancy vulnerability in the DAO contract to steal \$50 million
+worth of Ether.
+
+The hack led to a hard fork of Ethereum, creating Ethereum
+Classic (ETC) and Ethereum (ETH).
 \end{frame}
 
 
+\begin{frame}{Remix: The DAO Hack -- part 2}
+Let's recreate the DAO hack in Remix!
+
+\begin{enumerate}
+\item    Load the GitHub repo: \url{https://github.com/msooseth/reentrancy-attack}
+\item    Compile \& Deploy \textbf{FundRaiser}
+\item    Compile \& Deploy \textbf{Attacker}, with \textbf{FundRaiser} address as parameter
+\item    Set \textbf{Value} to 10000 and call \textbf{deposit} on Fundraiser. This will deposit money on YOUR balance
+\item    Call \textbf{getTotalFunds} on Fundraiser. Should show 10000.
+\item    Set \textbf{Value} to 400 and call \textbf{depositFunds} on Attacker. This will deposit money on the ATTACKER's balance
+\item    Call \textbf{getTotalFunds} on Fundraiser. Should show 10400.
+\item    Call \textbf{getFunds} on Attacker. Should show 0. The attacker has 0 funds currently.
+\item    Call \textbf{withdrawFunds} on Attacker. This is the attack.
+\item    Call \textbf{getFunds} on Attacker. Should show 1600 -- 4x what the Attacker deposited!
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{The Testing Pyramid}
+\centering
+\includegraphics[scale=0.8]{triangle3}
+\end{frame}
+
+
+\begin{frame}{The Testing Continued}
+\begin{itemize}
+    \item Things get more expensive as you go up the pyramid
+    \item Test types
+    \begin{itemize}
+        \item Positive test: correct password -- should log in
+        \item Negative test: incorrect password -- should not log in
+        \item Invariant test: total balance of all accounts should not change
+    \end{itemize}
+    \item Exploratory testing:
+    \begin{itemize}
+        \item manual review: auditing by a human
+        \item fuzz testing: ``randomly'' generate inputs to find bugs
+        \item symbolic execution: compute all possible inputs to find bugs
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Fuzzing}
+You just had a long lecture so I won't go into details :)
+Tools in Ethereum:
+\begin{itemize}
+    \item \textbf{Echidna}: Coverage-guided fuzzer for Ethereum smart contracts, via hevm
+    \item \textbf{Forge}: Built-in fauzzer as part of Foundry, only recently coverage-guided, via reth
+    \item \textbf{Medusa}: Fuzzer for Ethereum smart contracts based on geth
+\end{itemize}
+\end{frame}
 
 \section{What is Symbolic Execution}
-
-% \begin{frame}{A Quick Recap of Ethereum}
-% Ethereum is the second largest cryptocurrency in terms of value. Ethereum has:
-% \begin{itemize}
-% \item Contracts with \textbf{code and storage}, unlike e.g. Bitcoin
-% \item Stack-based VM, the EVM. Most popular executor of EVM: \textbf{geth}
-% \item ACID execution semantics, like a \textbf{database}
-% \item Proof-of-stake as its \textbf{consensus layer} -- ordering transactions
-% \end{itemize}
-
-% Downsides:
-% \begin{itemize}
-% \item Code and data are not clearly separated ("EOF" will solve)
-% \item JUMP destinations are known, but dynamic jumps are possible
-% \item All EVM instructions operate on 256b values
-% \end{itemize}
-
-% \end{frame}
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution vs Fuzzing}
 Say your code is:
@@ -350,7 +441,7 @@ Say your code is:
 function tricky(uint a, uint b) public pure {
 	// solution: a = 10000983843024
 	//           b = 9877982748934
-	
+
 	if (a * 2 + b == 29879950434982 &&
 	    b / 2 == 4938991374467) {
 		assert(false); // bad things happen
@@ -359,7 +450,7 @@ function tricky(uint a, uint b) public pure {
 \end{Verbatim}
 
 Fuzzing never finds this edge-case. Symbolic execution always finds it.
-\bigskip 
+\bigskip
 
 \textbf{In general, fuzzing is faster, but is incomplete. Symbolic execution is slower but complete.}
 
@@ -391,7 +482,7 @@ Concrete execution:
 \begin{Verbatim}[fontsize=\small]
 -----------     ax: 1    bx: 1
 cmp %ax %bx     ax: 1    bx: 1
-je .if_true     
+je .if_true
 ; false
 add %ax $4
 jmp short .end
@@ -404,8 +495,8 @@ add %ax $5      ax: 6    bx: 1
 Symbolic execution, with symbolic state:
 \begin{Verbatim}[fontsize=\small]
 -----------     ax: v1   bx: v2
-cmp %ax %bx     
-je .if_true     
+cmp %ax %bx
+je .if_true
 ; false
 add %ax $4      ax: v1+4 bx: v2
 jmp short .end
@@ -421,21 +512,6 @@ add %ax $5      ax: v1+5 bx: v2
 \bigskip
 
 For symbolic execution, we end up having to follow two executions. This can become exponential.
-\end{frame}
-
-
-\begin{frame}[fragile=singleslide]{EVM}
-\begin{itemize}
-    \item Stack machine
-    \item Everything is 256b by default, addresses are 160b
-    \item No undefined behaviour
-    \item No IO. No printing, disk, networking, etc.
-    \item Only has a few regions for data: returndata, calldata, memory, storage, (stack)
-    \item No pointers. One contiguous memory, calldata, and returndata region
-    \item No such thing as infinite loops: gas is a unit of execution that is always limited
-    \item No such thing as huge memory/storage usage: gas also limits memory and storage
-    \item There are calls to other code already deployed, sometimes not yet deployed (i.e. call to unknown code)
-\end{itemize}
 \end{frame}
 
 
@@ -469,39 +545,39 @@ Purely symbolic execution-based systems:
 
 
 
-%\begin{frame}[fragile=singleslide]{Symbolic Execution: example}
-%Say your code looks like this:
-%\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-%function overflow(uint a) public pure {
-%	uint b;
-%	unchecked { b = a + 1;}
-%	assert(b > a);
-%}
-%\end{Verbatim}
-%
-%
-%hevm can find the case where $a=0xffffff\ldots$ to trigger the assert due to roll-around. hevm gives you the \textbf{exact call to reproduce the bug}. This way of using hevm can find a \emph{known-bad state}.
-%
-%\end{frame}
+\begin{frame}[fragile=singleslide]{Symbolic Execution: example}
+Say your code looks like this:
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+function overflow(uint a) public pure {
+	uint b;
+	unchecked { b = a + 1;}
+	assert(b > a);
+}
+\end{Verbatim}
+
+
+hevm can find the case where $a=0xffffff\ldots$ to trigger the assert due to roll-around. hevm gives you the \textbf{exact call to reproduce the bug}. This way of using hevm can find a \emph{known-bad state}.
+
+\end{frame}
 
 
 
-%\begin{frame}[fragile=singleslide]{Symbolic Execution: Invariant Checking}
-%You can describe \textbf{invariants} of your contract and write them as functions Then assert these functions every time the invariant must hold.
-%\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-%function my_invariant() private pure returns inv {
-%	inv = ...calculate invariant...
-%}
-%	
-%function transfer(uint a) public pure {
-%	require(my_invariant());
-%	... your function code here ....
-%	assert(my_invariant());
-%}
-%\end{Verbatim}
-%
-%Here, instead of a known-bad state, we validate that we are always in state that matches our expectations.
-%\end{frame}	
+\begin{frame}[fragile=singleslide]{Symbolic Execution: Invariant Checking}
+You can describe \textbf{invariants} of your contract and write them as functions Then assert these functions every time the invariant must hold.
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+function my_invariant() private pure returns inv {
+	inv = ...calculate invariant...
+}
+
+function transfer(uint a) public pure {
+	require(my_invariant());
+	... your function code here ....
+	assert(my_invariant());
+}
+\end{Verbatim}
+
+Here, instead of a known-bad state, we validate that we are always in state that matches our expectations.
+\end{frame}
 
 \begin{frame}{hevm: Symbolic Execution for Counterexample Generation}
 \centering
@@ -702,7 +778,7 @@ Limitations:
 % \end{frame}
 
 %% DEVCON maybe add?
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Simplification} 
+% \begin{frame}[fragile=singleslide]{Intermediate Representation: Simplification}
 % We do all the following rewrites to fixedpoint:
 % \begin{itemize}
 % \item Constant folding
@@ -891,7 +967,7 @@ Code: \qquad \qrcode[height=1in]{https://github.com/ethereum/hevm/}
 %
 %
 %You now have a full development environment, with all necessary tools installed, including Z3.
-%\bigskip 
+%\bigskip
 %
 %hevm is written in Haskell, but there are many areas that can be contributed to without deep knowledge of Haskell. For example, expression simplification:
 %
