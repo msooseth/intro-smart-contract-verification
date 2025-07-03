@@ -17,34 +17,311 @@
 \tikzstyle{arrow3} = [thick, ->, draw=blue]
 
 \title[hevm]{
-hevm, a flexible symbolic execution framework to verify EVM bytecode}
-\author[dxo, Soos, Paraskevopoulou]{dxo, \emph{Mate Soos}, Zoe Paraskevopoulou}
+A gentle introduction to formal verification of Ethereum smart contracts}
+\author[Soos]{Mate Soos}
 \institute[Argot]{\large Argot Collective (\url{https://argot.org})}
-\date{11th of June 2025, Dagstuhl Seminar
-Testing Program Analyzers and Verifiers \url{https://www.dagstuhl.de/25242}}
+\date{9th of July 2025}
+\subtitle{Brussels 4th Summer School on Security Testing and Verification}
 
 
 \begin{document}
 \begin{frame}
-    \titlepage 
+    \titlepage
 \end{frame}
 
-%\begin{frame}{A bit about myself}
-%\begin{itemize}
-%\item PhD from INRIA Grenoble, France, wrote CryptoMiniSat, a SAT solver with the theory of Gauss-Jordan elimination
-%\item Worked in IT Security industry for 10+ years
-%\item Research at Kuldeep Meel's group for the past 5 years, mostly on counting and sampling
-%\item Working at Ethereum Foundation for the past 2 years
-%\end{itemize}
-%\bigskip
-%
-%A lot of what I did were rewrite systems: preprocessors, inprocessors, etc. hevm is in large part, a rewrite system
-%\end{frame}
+\begin{frame}{A bit about myself}
+\begin{itemize}
+\item PhD from INRIA Grenoble, France, where I wrote CryptoMiniSat, a SAT solver with the theory of Gauss-Jordan elimination
+\item Worked in IT Security industry for 10+ years
+\item Part-time Research at Kuldeep Meel's group for the past 5 years, mostly on counting and sampling
+\item Working at Ethereum Foundation, now Argot Collective for the past 3+ years
+\end{itemize}
+\end{frame}
 
 % Outline frame
 \begin{frame}{Outline}
     \tableofcontents
 \end{frame}
+
+
+\section{Blockchain}
+\begin{frame}{What is a Blockchain}
+A blockchain is a \textbf{distributed ledger} that is replicated across many nodes. It is:
+\begin{itemize}
+    \item \textbf{immutable} -- once written, it cannot be changed
+    \item \textbf{append-only} -- once written, it cannot be deleted
+    \item \textbf{transparent} -- anyone can see the contents of the blockchain
+    \item \textbf{decentralized} -- no single entity controls the blockchain
+    \item \textbf{consensus-based} -- nodes agree on the state of the blockchain
+    \item \textbf{permissionless} -- anyone can participate in the network (censorship resistant)
+    \item \textbf{trustless} -- no need to trust any single entity, the system works as a whole
+\end{itemize}
+\bigskip
+
+Immutable caveat: except when everyone agrees it should be undone$\ldots$ (see the DAO hack)
+\end{frame}
+
+\begin{frame}{Ethereum Blockhain}
+\begin{itemize}
+    \item \textbf{programmable} -- it can execute code, i.e. smart contracts (via EVM)
+    \item \textbf{open-source} -- the code is available for anyone to inspect and contribute (via GitHub)
+    \item \textbf{community-driven} -- the development is driven by the community (e.g. ACD meetings)
+    \item \textbf{interoperable} -- it can interact with other blockchains and systems (via bridges)
+    \item \textbf{innovative} -- it is constantly evolving and improving (EIPs)
+    \item \textbf{TODO: scalable} -- it can handle a large number of transactions (via ZK/sharding)
+\end{itemize}
+\bigskip
+
+Currently, 30TPS on mainnet. Layer 2s can handle much more, but with lower guarantees.
+\end{frame}
+
+\begin{frame}{What is Ethereum used for?}
+
+Decentralized:
+\begin{itemize}
+    \item \textbf{finance} -- enables new financial systems and applications
+    \item \textbf{identity} -- enables new ways of managing identity and access
+    \item \textbf{governance} -- enables new ways of managing and governing systems
+    \item \textbf{marketplaces} -- enables new ways of buying and selling goods and services
+    \item \textbf{gaming} -- enables new ways of playing and interacting with games
+\end{itemize}
+\bigskip
+
+Some of these are simply re-packaging of existing concepts in a 
+in a decentralized context. Here, the \textbf{permissionless} and 
+\textbf{ACID} properties can sometimes come very handy.
+\end{frame}
+
+\begin{frame}{Decentralized Applications (dApps) on Ethereum}
+\begin{itemize}
+    \item \textbf{MakerDAO} -- stablecoin protocol
+    \item \textbf{Uniswap, Suhiswap} -- exchange for trading tokens
+    \item \textbf{ENS} -- domain name system for Ethereum addresses
+    \item \textbf{Gitcoin} -- platform for funding open-source projects
+    \item \textbf{Aave, Compund} -- lending and borrowing protocol
+    \item \textbf{Tornado Cash} -- privacy protocol for Ethereum transactions
+    % \item \textbf{Flashloans} -- instant loans without collateral
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Let's Explore}
+\begin{itemize}
+    \item UniSwap: \url{https://app.uniswap.org/}
+    \item AAVE: \url{https://app.aave.com/markets/}
+    \item ENS: \url{https://app.ens.domains/}
+    \item Gitcoin: \url{https://impact.gitcoin.co/}
+    \item Tornado Cash: \url{https://tornado.cash/}
+    \item MEV: \url{https://libmev.com/}
+    \item Betting: \url{https://polymarket.com/}
+    \item L2s: \url{https://l2beat.com/scaling/summary}
+    \item UniSwap Fees Collected: \url{https://dune.com/gammastrategies/Uniswap-v3-Volume-and-Fees-Collected}
+    \item dApps: \url{https://www.growthepie.com/applications}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The Layers of Ethereum}
+\begin{itemize}
+    \item \textbf{Execution layer} -- executes the code of smart contracts as triggered by
+        transactions. Performed by the EVM
+    \item \textbf{Consensus layer} -- ensures all nodes agree on the state of the blockchain. 
+        Currently managed via proof-of-stake.
+    \item \textbf{Data Availability Layer} --  ensures that transaction data is
+        available (e.g. via data availability sampling)
+    \item \textbf{**Application layer} -- provides the user interface and
+        interaction with the blockchain (dApps)
+\end{itemize}
+\bigskip
+
+The execution layer is the most important for us, as it is where the smart
+contracts are executed.
+\end{frame}
+
+\section{The EVM}
+\begin{frame}{What is the EVM?}
+The Ethereum Virtual Machine (EVM) is the \textbf{execution environment} for
+smart contracts on Ethereum. It is:
+\begin{itemize}
+    \item \textbf{stack machine} -- instead of registers, it uses a stack
+    \item \textbf{bytecode-based} -- it executes bytecode instructions
+    \item \textbf{deterministic} -- it produces the same result for the same input \& state
+    \item \textbf{isolated} -- it runs in a sandboxed environment
+    \item \textbf{gas-based} -- it charges for execution based on gas consumption
+    \item \textbf{ACID-compliant} -- it provides atomicity, consistency, isolation, and durability
+\end{itemize}
+\bigskip
+The EVM is the heart of Ethereum, as it executes the code of smart contracts and
+manages the state of the blockchain.
+\end{frame}
+
+\begin{frame}{EVM Instructions Overview}
+The EVM has a set of instructions that can be used to manipulate the state of the
+blockchain. These instructions are divided into several categories:
+\begin{itemize}
+    \item \textbf{Arithmetic/Logic Ops} -- basic operations like add, multiplication, div, $\ldots$
+    \item \textbf{Control Flow Ops} -- jumps, program counter, halting, revert, $\ldots$
+    \item \textbf{Stack/Memory/Storage Ops} -- stack manipulation, memory\&storage access, $\ldots$
+    \item \textbf{External Calls and Contracts} -- calling contracts, transferring value, creating contracts
+    \item \textbf{Context Ops} -- accessing block context, gas information, contract information, logging
+\end{itemize}
+\bigskip
+
+\url{https://www.evm.codes/}
+\end{frame}
+
+
+\begin{frame}{EVM Instructions Part 1}
+
+\begin{block}{Arithmetic/Logic (ALU) Operations}
+\begin{itemize}
+    \item Basic arithmetic: \texttt{ADD}, \texttt{SUB}, \texttt{MUL}, \texttt{DIV}, \texttt{MOD}, \texttt{EXP}, \texttt{SIGNEXTEND}
+    \item Bitwise operations: \texttt{AND}, \texttt{OR}, \texttt{XOR}, \texttt{NOT}
+    \item Comparisons: \texttt{LT}, \texttt{GT}, \texttt{EQ}, \texttt{ISZERO}, \texttt{SLT}, \texttt{SGT}
+    \item Shift operations: \texttt{SHL}, \texttt{SHR}, \texttt{SAR}
+    \item Special operations: \texttt{KECCAK256}
+\end{itemize}
+\end{block}
+
+\begin{block}{Control Flow Operations}
+\begin{itemize}
+    \item Jumps: \texttt{JUMP}, \texttt{JUMPI}
+    \item Program counter: \texttt{PC}
+    \item Halting: \texttt{STOP}, \texttt{RETURN}, \texttt{REVERT}
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{EVM Instructions Part 2}
+\begin{block}{Stack/Memory/Storage Operations}
+\begin{itemize}
+    \item Stack manipulation: \texttt{PUSH}, \texttt{POP}, \texttt{DUP}, \texttt{SWAP}
+    \item Memory access: \texttt{MLOAD}, \texttt{MSTORE}
+    \item Storage: \texttt{SLOAD}, \texttt{SSTORE}, \texttt{TSLOAD}, \texttt{TSSTORE}
+    \item Calldata: \texttt{CALLDATALOAD}, \texttt{CALLDATASIZE}, \texttt{CALLDATACOPY}
+    \item Return data: \texttt{RETURNDATASIZE}, \texttt{RETURNDATACOPY}
+    \item Code access: \texttt{CODECOPY}, \texttt{EXTCODECOPY}
+\end{itemize}
+\end{block}
+
+
+\begin{block}{External Calls and Contracts}
+\begin{itemize}
+    \item Call ops: \texttt{CALL}, \texttt{CALLCODE}, \texttt{DELEGATECALL}, \texttt{STATICCALL}
+    \item Value transfer: \texttt{CALLVALUE}, \texttt{TRANSFER}
+    \item Contract creation: \texttt{CREATE}, \texttt{CREATE2}, \texttt{SELFDESTRUCT}
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{EVM Instructions Part 3}
+\begin{block}{Context}
+\begin{itemize}
+    \item Block Context: \texttt{COINBASE}, \texttt{TIMESTAMP}, \texttt{NUMBER},
+        \texttt{PREVRANDAO},
+        \texttt{ADDRESS}, \texttt{BALANCE}, \texttt{ORIGIN},  \texttt{CALLER}, 
+        \texttt{BLOCKHASH}, \texttt{DIFFICULTY}, \texttt{BLOBHASH}, \texttt{BLOBBASEFEE}, \texttt{CHAINID}
+    \item Gas: \texttt{GAS}, \texttt{GASLIMIT}, \texttt{GASPRICE}
+    \item Contract information: \texttt{EXTCODESIZE}, \texttt{EXTCODEHASH}, \texttt{MSIZE}
+    \item Logging: \texttt{LOG}
+\end{itemize}
+\end{block}
+\end{frame}
+
+
+\begin{frame}{ABI}
+The Application Binary Interface (ABI) is the interface between smart contracts and external applications. It defines how to encode and decode data for function calls, events, and errors.
+\bigskip
+
+The ABI is used to:
+\begin{itemize}
+    \item Encode function calls and parameters
+    \item Decode return values
+    \item Handle errors
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile=singleslide]{ABI function call}
+\begin{itemize}
+    \item Function signature is a 4-byte hash of the function name and its parameter types
+    \item Function parameters follow, with packed encoding (e.g. 4 uint64-s will be packed into 32 bytes)
+\end{itemize}
+\bigskip
+
+Example:
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+$ cast keccak "get()"
+0x6d4ce63caa65600744ac797760560da39ebd16e8240936b51f53368ef9e0e01f
+\end{Verbatim}
+Hence, the function signature for \texttt{get()} is \texttt{0x6d4ce63c}. So:
+
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+(bool success, bytes memory data) = address(myContract).call("get()");
+\end{Verbatim}
+
+will generate the calldata \texttt{0x6d4ce63c} as the first 4 bytes, followed by 0 bytes for the empty parameters.
+\end{frame}
+
+\begin{frame}[fragile=singleslide]{ABI error/panic}
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+(bool success, bytes memory data) = address(myContract).call(
+    abi.encodeWithSignature("myfun(uint256)", 42));
+if (!success) {
+    bytes4 errorSelector;
+    assembly { errorSelector := mload(add(data, 0x20)) }
+    if (errorSelector == bytes4(keccak256("Error(string)"))) {
+        string memory reason = abi.decode(data, (string));
+        // reason is a string, e.g. "revert"
+    } else if (errorSelector == bytes4(keccak256("Panic(uint256)"))) {
+        uint256 code = abi.decode(data, (uint256));
+        // Panic code is a uint256, e.g. 0x11
+    }
+}
+\end{Verbatim}
+\end{frame}
+
+\begin{frame}{EVM: Panic Codes}
+\begin{itemize}
+    \item 0x00: Generic compiler inserted panics.
+    \item 0x01: Call assert with an argument that evaluates to false.
+    \item 0x11: Arithmetic operation results in underflow or overflow
+    \item 0x12; Divide or modulo by zero (e.g. 5 / 0 or 23 \% 0).
+    \item 0x21: Convert a value that is too big or negative into an enum type.
+    \item 0x22: Access a storage byte array that is incorrectly encoded.
+    \item 0x31: Call .pop() on an empty array.
+    \item 0x32: Access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. $x[i]$ where $i >= x.length$ or $i < 0$).
+    \item 0x41: Allocate too much memory or create an array that is too large.
+    \item 0x51: Call a zero-initialized variable of internal function type.
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Programming the EVM}
+We use Solidity to program the EVM, with YUL inline assembly:
+\begin{itemize}
+    \item \textbf{Imperative}, high-level language -– Code is executed step-by-step with explicit control flow (like C++).
+    \item \textbf{Statically typed} -- Variable types must be declared at compile time (e.g., uint, string).
+    \item \textbf{Object-oriented} -- Supports contracts (similar to classes), inheritance, interfaces, and libraries.
+    \item \textbf{Smart contract focus -- Designed for writing decentralized apps (dApps)
+    \item \textbf{Special features -- Built-in globals (e.g., msg.sender, block.timestamp), gas management, etc.
+\end{itemize}
+\bigskip
+
+\url{https://docs.soliditylang.org/en/v0.8.30/}
+\end{frame}
+
+
+\begin{frame}{Online development envorinment: Remix}
+Built-in:
+\begin{itemize}
+    \item Solidity compiler
+    \item EVM simulator
+    \item Debugger
+    \item Static analysis tools
+    \item Unit testing framework
+\end{itemize}
+\url{https://https://remix.ethereum.org/}
+\end{frame}
+
+
 
 \section{What is Symbolic Execution}
 
