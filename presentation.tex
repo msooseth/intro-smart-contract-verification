@@ -3,12 +3,30 @@
 \usepackage{framed}
 \usepackage{caption}
 \usepackage{qrcode}
+\usepackage{amsmath}
 \usetheme{CambridgeUS}
 
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning}
+
+\lstdefinelanguage{smtlib}{
+    keywords={declare-const, assert, check-sat, get-model},
+    sensitive=true,
+    morecomment=[l]{;},
+    morestring=[b]",
+}
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    numbers=none,
+    frame=single,
+    captionpos=b,
+    breaklines=true,
+}
+
 \tikzstyle{process} = [rectangle, minimum width=3cm, text centered, draw=black, fill=orange!30]
 \tikzstyle{decision} = [rectangle, minimum width=3cm, text centered, draw=black, fill=green!30]
 \tikzstyle{code} = [rectangle, minimum width=3cm, text centered, draw=black, fill=yellow!20]
@@ -95,7 +113,7 @@ A blockchain is a \textbf{distributed ledger} that is replicated across many nod
     \item \textbf{Append-only} -- once written, it cannot be deleted
     \item \textbf{Transparent} -- anyone can see the contents of the blockchain
     \item \textbf{Decentralized} -- no single entity controls the blockchain
-    \item \textbf{Consensus-based} -- nodes agree on the state of the blockchain
+    \item \textbf{Consensus-based} -- nodes agree on the state of the blockchain: PoW/PoS
     \item \textbf{Permissionless} -- anyone can participate in the network (censorship resistant)
     \item \textbf{Trustless} -- no need to trust any single entity, the system works as a whole
 \end{itemize}
@@ -201,7 +219,9 @@ Notice:
 \end{itemize}
 \smallskip
 
-Etherscan:\url{https://etherscan.io/tx/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a}
+Etherscan:
+\url{https://etherscan.io/tx/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a}
+
 Net ``profit'' for the ``attacker'': ~7M USD
 \end{frame}
 
@@ -262,8 +282,13 @@ The EVM executes the code of smart contracts and manages the state of the blockc
 \end{frame}
 
 \begin{frame}{EVM Overview}
-\centering
+\begin{center}
     \includegraphics[scale=0.5]{EVM-state}
+\end{center}
+\vfill
+
+\tiny
+Illustration from: \url{takenobu-hs/ethereum-evm-illustrated}, BSD License
 \end{frame}
 
 \begin{frame}{EVM Instructions Overview}
@@ -685,7 +710,6 @@ Purely symbolic execution-based systems:
 \end{itemize}
 \end{frame}
 
-
 \section{Our symbolic execution tool: hevm}
 \begin{frame}{Overview of hevm}
 \begin{itemize}
@@ -698,6 +722,71 @@ Purely symbolic execution-based systems:
 \end{itemize}
 \end{frame}
 
+\begin{frame} {Satisfiability Modulo Theories (SMT) Solvers}
+\textbf{What is an SMT solver?}
+\begin{itemize}
+    \item Extends SAT solvers by supporting \textbf{first-order logic with theories} (e.g., arithmetic, arrays, bit-vectors)
+    \item Decides the satisfiability of logical formulas over \textbf{background theories}
+\end{itemize}
+
+\textbf{Key Applications:}
+\begin{itemize}
+    \item Formal verification (hardware/software)
+    \item Program analysis (symbolic execution)
+    \item Automated theorem proving
+\end{itemize}
+
+\textbf{Example Theory Combinations:}
+\begin{itemize}
+    \item Bit-vectors: $x \ll 2 == 0b1000$
+    \item Arrays: $A[i] = A[j]$
+    \item Uninterpreted functions: $f(x) = f(y)$
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile=singleslide]{SMT Solving in Practice}
+\textbf{Example Query (Using Z3 Syntax):}
+\begin{lstlisting}[language=smtlib]
+(declare-const x Int)
+(declare-const y Int)
+(assert (>= x 0))
+(assert (>= y 0))
+(assert (= (+ (* 2 x) y) 10))
+(check-sat)
+(get-model)
+\end{lstlisting}
+\textbf{Result:}
+Solver finds a satisfying model, e.g., $x = 5$, $y = 0$
+\bigskip
+
+\textbf{Why SMT?}
+\begin{itemize}
+    \item Combines \textbf{SAT} efficiency with \textbf{domain-specific reasoning}
+    \item Theories to model: bitvectors, arrays, arithmetic, and
+        uninterpreted functions (AUFBV)
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile=singleslide]{SMT solver hands-on: z3 in the browser}
+Navigate to: \url{https://jfmc.github.io/z3-play/}
+\bigskip
+
+Example bitvector query:
+\begin{lstlisting}[language=smtlib]
+(set-logic QF_BV)
+(declare-const x (_ BitVec 8))
+(declare-const y (_ BitVec 8))
+(assert (= (bvadd x y) (_ bv7 8)))
+(check-sat)
+(get-model)
+\end{lstlisting}
+\bigskip
+
+Let's require that one is $>7$:
+\begin{lstlisting}[language=smtlib]
+(assert (bvugt x (_ bv7 8)))
+\end{lstlisting}
+\end{frame}
 
 \begin{frame}{hevm: How to define what's a bug?}
 \begin{itemize}
@@ -712,6 +801,19 @@ This way we allow others to be opinionated, but we ourselves remain unopinionate
 
 But: it misses the ability to express some invariants, e.g. ``total balance of
 all accounts should not change''.
+\end{frame}
+
+\begin{frame}{Certora Verification Language (CVL)}
+Certora Prover uses a specification language called CVL to express properties
+of the contract. CVL is a domain-specific language for writing specifications
+of smart contracts. It allows you to express properties of the contract in a
+declarative way, and then prove that the contract satisfies these properties.
+
+\bigskip
+
+Example CVL specification for SQRT approximation over fixed-point numbers:
+\small
+\url{https://github.com/Certora/tutorials-code/tree/master/lesson4_invariants/sqrt}
 \end{frame}
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution: example}
@@ -1018,7 +1120,6 @@ Notice: we use less-or-equal, because we want a \textbf{counterexample}
  \bigskip
 
  Notice that geth, the normal EVM concrete executor is incredibly slow. Hence a transpiled IR could achieve serious speedup.
-
  \end{frame}
 
  \begin{frame}[fragile=singleslide]{Solving the IR: using an SMT Solver}
@@ -1029,25 +1130,77 @@ Notice: we use less-or-equal, because we want a \textbf{counterexample}
  \end{Verbatim}
 
  The SMT expression for this could be:
-
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+\begin{lstlisting}[language=smtlib]
  (set-logic QF_AUFBV)
  (define-sort Word () (_ BitVec 256))
- (declare-const varA (Word))
+ (declare-fun varA (Word))
  (assert (bvule (bvadd varA (_ bv1 256)) varA))
  (check-sat)
- \end{Verbatim}
+ (get-model)
+\end{lstlisting}
 
  Z3 gives the answer:
-
  \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
  sat
- (
-   (define-fun varA () (_ BitVec 256)
+ define-fun varA () (_ BitVec 256)
      #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
- )
  \end{Verbatim}
  \end{frame}
+
+ \begin{frame}[fragile=singleslide]{Example Solidity Test}
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+import {Test} from "forge-std/Test.sol";
+contract MyContractOverflow is Test {
+  uint balance = 100;
+  function prove_overflow(uint amt) public {
+    unchecked { balance += amt; }
+    assert(balance >= amt);
+  } }
+ \end{Verbatim}
+
+
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+Checking 1 function(s) in contract src/overflow-test.sol:MyContractOverflow
+[RUNNING] prove_overflow(uint256)
+   Exploring call prefix 0x7a400a2b
+   Exploration finished, 3 branch(es) to check in call prefix 0x7a400a2b
+   SMT result: Cex SMTCex {vars = fromList [(Var "arg1",0xffffffffffff...
+   Found 1 potential counterexample(s) in call prefix 0x7a400a2b
+   [FAIL] prove_overflow
+   Counterexample:
+     calldata: prove_overflow(115792089237316195423570985008687907853269984665640564039457584007913129639864)
+\end{Verbatim}
+ \end{frame}
+
+ \begin{frame}[fragile=singleslide]{Example Solidity Test: IR + SMT}
+IR for the counterexample is:
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+(PLT
+  (Add
+    100
+    (Var "arg1")
+  )
+  (Var "arg1")
+)
+\end{Verbatim}
+
+SMT expression:
+\begin{lstlisting}[language=smtlib]
+(set-logic QF_AUFBV)
+(define-sort Word () (_ BitVec 256))
+(declare-fun arg1 () (_ BitVec 256))
+(assert (bvult (bvadd (_ bv100 256) arg1) arg1))
+(check-sat)
+(get-model)
+\end{lstlisting}
+
+ % Z3 gives the answer:
+ % \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+ % sat
+ % define-fun varA () (_ BitVec 256)
+ %     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+ % \end{Verbatim}
+\end{frame}
 
 \section{Correctness}
 \begin{frame}{How we ensure correctness of hevm}
@@ -1133,10 +1286,6 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 \end{frame}
 
 
-\begin{frame}{Thank you for your time!}
-    Thanks for listening!
-\end{frame}
-
 
 % \section{Results}
 % \begin{frame}[fragile=singleslide]{Results}
@@ -1186,8 +1335,10 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
  \end{frame}
 
 \begin{frame}[fragile=singleslide]{Conclusions}
-
-hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and array/map-specific rewrites to lower the complexity of solving the final SMT expression.
+hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM
+bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and
+array/map-specific rewrites to lower the complexity of solving the final SMT
+expression.
 \bigskip
 
 %Download hevm from \url{https://github.com/ethereum/hevm/releases}
@@ -1203,9 +1354,10 @@ cabal repl test
 [...]
 > :main
 \end{Verbatim}
-
 \end{frame}
 
-
+\begin{frame}{Thank you for your time!}
+    Thanks for listening!
+\end{frame}
 
 \end{document}
