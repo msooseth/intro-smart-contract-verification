@@ -1071,83 +1071,81 @@ Notice: we use less-or-equal, because we want a \textbf{counterexample}
  \begin{frame}[fragile=singleslide]{Intermediate Representation: Simplification}
  We do all the following rewrites to fixedpoint:
  \begin{itemize}
- \item Constant folding
- \item Canonicalization of all commutative operators (concrete value first)
- \item Canonicalization of all less-than/greater-than/etc operators
- \item Canonicalization of all Keccak expressions to match Solidity patterns
- \item Stripping writes when they are not read
- \item Stripping reads when they are not used
- \item (In)equality propagation
- \item All meaningful rewrites, such as min/max/add+sub/add+add/sub+sub/etc.
- \item Special rewrite rules for array/map lookups and other Solidity patterns
+     \item Constant folding
+     \item Canonicalization of all commutative operators (concrete value first)
+     \item Canonicalization of all less-than/greater-than/etc operators
+     \item Canonicalization of all Keccak expressions to match Solidity patterns
+     \item Stripping writes when they are not read
+     \item Stripping reads when they are not used
+     \item (In)equality propagation
+     \item All meaningful rewrites, such as min/max/add+sub/add+add/sub+sub/etc.
+     \item Special rewrite rules for array/map lookups and other Solidity patterns
  \end{itemize}
  \end{frame}
 
- \begin{frame}[fragile=singleslide]{Intermediate Representation: Haskell to the Rescue}
+\begin{frame}[fragile=singleslide]{Intermediate Representation: Haskell to the Rescue}
+Haskell supports algebraic data types (ADTs), so our intermediate representation (IR) can be fully typed. Furthermore, Haskell supports pattern matching, so our rewrite rules are easy to read \& write:
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+    -- syntactic Eq reduction
+    go (Eq (Lit a) (Lit b))
+      | a == b = Lit 1
+      | otherwise = Lit 0
+    go (Eq (Lit 0) (Sub a b)) = eq a b
+    go (Eq a b)
+      | a == b = Lit 1
+      | otherwise = eq a b
+\end{Verbatim}
+\end{frame}
 
- Haskell supports algebraic data types (ADTs), so our intermediate representation (IR) can be fully typed. Furthermore, Haskell supports pattern matching, so our rewrite rules are easy to read \& write:
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-     -- syntactic Eq reduction
-     go (Eq (Lit a) (Lit b))
-       | a == b = Lit 1
-       | otherwise = Lit 0
-     go (Eq (Lit 0) (Sub a b)) = eq a b
-     go (Eq a b)
-       | a == b = Lit 1
-       | otherwise = eq a b
- \end{Verbatim}
- \end{frame}
+\begin{frame}[fragile=singleslide]{What can we use the IR for?}
+\begin{itemize}
+    \item Finding counterexamples with SMT solvers
+    \item Constant extraction: helping other fuzzers with "magic numbers"
+    \item Substitute constants and fold: we can build a fuzzer
+    \item Not just failing branches: automated test-case generation
+    \item Review by humans: the IR is a clean representation of the problem
+\end{itemize}
+\end{frame}
 
- \begin{frame}[fragile=singleslide]{What can we use the IR for?}
- \begin{itemize}
- \item Finding counterexamples with SMT solvers
- \item Constant extraction: helping other fuzzers with "magic numbers"
- \item Substitute constants and fold: we can build a fuzzer
- \item Not just failing branches: automated test-case generation
- \end{itemize}
+\begin{frame}[fragile=singleslide]{Solving the IR: Creating a Fuzzer}
+Fuzzing sounds strange given that hevm is a symbolic execution engine. However:
+\begin{itemize}
+\item The IR is actually a very clean representation of the problem at hand
+\item Due to the extensive simplifications applied, it can contain specific constants that may be very hard to find otherwise
+\item IR \emph{could} be transpiled to assembly (potentially through \texttt{C}), and executed as a program
+\end{itemize}
+\bigskip
 
- \end{frame}
+Notice that geth, the normal EVM concrete executor is incredibly slow. Hence a transpiled IR could achieve serious speedup.
+\end{frame}
 
- \begin{frame}[fragile=singleslide]{Solving the IR: Creating a Fuzzer}
+\begin{frame}[fragile=singleslide]{Solving the IR: using an SMT Solver}
+The IR is translated in a straightforward manner to SMT. Let's say the expression is:
 
- Fuzzing sounds strange given that hevm is a symbolic execution engine. However:
- \begin{itemize}
- \item The IR is actually a very clean representation of the problem at hand
- \item Due to the extensive simplifications applied, it can contain specific constants that may be very hard to find otherwise
- \item IR \emph{could} be transpiled to assembly (potentially through \texttt{C}), and executed as a program
- \end{itemize}
- \bigskip
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+PLEq (Add (Var "a") (Lit 1)) (Var "a")
+\end{Verbatim}
 
- Notice that geth, the normal EVM concrete executor is incredibly slow. Hence a transpiled IR could achieve serious speedup.
- \end{frame}
-
- \begin{frame}[fragile=singleslide]{Solving the IR: using an SMT Solver}
- The IR is translated in a straightforward manner to SMT. Let's say the expression is:
-
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
- PLEq (Add (Var "a") (Lit 1)) (Var "a")
- \end{Verbatim}
-
- The SMT expression for this could be:
+The SMT expression for this could be:
 \begin{lstlisting}[language=smtlib]
- (set-logic QF_AUFBV)
- (define-sort Word () (_ BitVec 256))
- (declare-const varA (Word))
- (assert (bvule (bvadd varA (_ bv1 256)) varA))
- (check-sat)
- (get-model)
+(set-logic QF_AUFBV)
+(define-sort Word () (_ BitVec 256))
+(declare-const varA (Word))
+(assert (bvule (bvadd varA (_ bv1 256)) varA))
+(check-sat)
+(get-model)
 \end{lstlisting}
 
- Z3 gives the answer:
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
- sat
- define-fun varA () (_ BitVec 256)
-     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
- \end{Verbatim}
- \end{frame}
+Z3 gives the answer:
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+sat
+define-fun varA () (_ BitVec 256)
+    #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+\end{Verbatim}
+\end{frame}
 
- \begin{frame}[fragile=singleslide]{Example Solidity Test}
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+\begin{frame}[fragile=singleslide]{Example Solidity Test}
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
 import {Test} from "forge-std/Test.sol";
 contract MyContractOverflow is Test {
   uint balance = 100;
@@ -1155,10 +1153,10 @@ contract MyContractOverflow is Test {
     unchecked { balance += amt; }
     assert(balance >= amt);
   } }
- \end{Verbatim}
+\end{Verbatim}
 
 
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
 Checking 1 function(s) in contract src/overflow-test.sol:MyContractOverflow
 [RUNNING] prove_overflow(uint256)
    Exploring call prefix 0x7a400a2b
@@ -1169,11 +1167,11 @@ Checking 1 function(s) in contract src/overflow-test.sol:MyContractOverflow
    Counterexample:
      calldata: prove_overflow(115792089237316195423570985008687907853269984665640564039457584007913129639864)
 \end{Verbatim}
- \end{frame}
+\end{frame}
 
- \begin{frame}[fragile=singleslide]{Example Solidity Test: IR + SMT}
+\begin{frame}[fragile=singleslide]{Example Solidity Test: IR + SMT}
 IR for the counterexample is:
- \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
 (PLT
   (Add
     100
@@ -1193,12 +1191,12 @@ SMT expression:
 (get-model)
 \end{lstlisting}
 
- % Z3 gives the answer:
- % \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
- % sat
- % define-fun varA () (_ BitVec 256)
- %     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
- % \end{Verbatim}
+% Z3 gives the answer:
+% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+% sat
+% define-fun varA () (_ BitVec 256)
+%     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+% \end{Verbatim}
 \end{frame}
 
 \section{Correctness}
@@ -1269,8 +1267,6 @@ without deep knowledge of Haskell. For example, expression simplification:
 All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressive language
 \end{frame}
 
-
-
 % \section{Results}
 % \begin{frame}[fragile=singleslide]{Results}
 % \small
@@ -1280,7 +1276,6 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 % [1] \url{https://github.com/eth-sc-comp/benchmarks/}
 % [2] \url{https://github.com/a16z/halmos}
 % \end{frame}
-
 
 % \begin{frame}[fragile=singleslide]{Results}
 % We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks [1], on an AMD 5950x with 5min timeout,  and 128GB of RAM. For more details: $\rightarrow$ see paper!
@@ -1293,25 +1288,24 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 % [1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
 % \end{frame}
 
+\section{Conclusions}
+\begin{frame}[fragile=singleslide]{Limitations \& Future Work}
+hevm has a number of inherent limitations:
 
- \section{Conclusions}
- \begin{frame}[fragile=singleslide]{Limitations \& Future Work}
- hevm has a number of inherent limitations:
+\begin{itemize}
+\item Loops are challenging. We have an iteration limit until which loops are examined
+\item Recursion, and parametric calls can cause hevm to only partially explore the state
+\item Complicated mathematical expressions (e.g. division, modulo) can cause a challenge
+\item hevm is not verified, and neither are SMT solvers
+\end{itemize}
+\vspace{2ex}
 
- \begin{itemize}
- \item Loops are challenging. We have an iteration limit until which loops are examined
- \item Recursion, and parametric calls can cause hevm to only partially explore the state
- \item Complicated mathematical expressions (e.g. division, modulo) can cause a challenge
- \item hevm is not verified, and neither are SMT solvers
- \end{itemize}
- \vspace{2ex}
-
- Future work:
- \begin{itemize}
- \item Symbolic CopySlice handling
- \item Better handling of loops and recursion: include into IR, and solve for invariant via CHC
- \end{itemize}
- \end{frame}
+Future work:
+\begin{itemize}
+\item Symbolic CopySlice handling
+\item Better handling of loops and recursion: include into IR, and solve for invariant via CHC
+\end{itemize}
+\end{frame}
 
 \begin{frame}[fragile=singleslide]{Conclusions}
 hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM
