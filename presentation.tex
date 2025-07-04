@@ -31,10 +31,19 @@ A gentle introduction to formal verification of Ethereum smart contracts}
 
 \begin{frame}{A bit about myself}
 \begin{itemize}
-\item PhD from INRIA Grenoble, France, where I wrote CryptoMiniSat, a SAT solver with the theory of Gauss-Jordan elimination
-\item Worked in IT Security industry for 10+ years
-\item Part-time Research at Kuldeep Meel's group for the past 5 years, mostly on counting and sampling
-\item Working at Ethereum Foundation, now Argot Collective for the past 3+ years
+\item PhD from INRIA Grenoble, France
+\item Part-time research at Kuldeep Meel's group, authored::
+    \begin{itemize}
+        \item CryptoMiniSat -- SAT solver with XORs
+        \item Ganak\&ApproxMC -- CNF counters
+        \item Arjun -- CNF simplifier
+        \item Bosphorus -- ANF simplifier
+        \item Pepin -- DNF counter
+    \end{itemize}
+\item Worked in IT Security for 10+ years: hacking,
+    threat modelling, risk management
+\item Working at Ethereum Foundation, now Argot Collective for the past 3+
+    years
 \end{itemize}
 \end{frame}
 
@@ -100,7 +109,7 @@ in a decentralized context. Here, the \textbf{permissionless} and
     \item \textbf{ENS} -- domain name system for Ethereum addresses
     \item \textbf{Gitcoin} -- platform for funding open-source projects
     \item \textbf{Aave, Compund} -- lending and borrowing protocol
-    \item \textbf{Tornado Cash} -- privacy protocol for Ethereum transactions
+    \item \textbf{Tornado Cash} -- ZK-based privacy mixer for transactions
     % \item \textbf{Flashloans} -- instant loans without collateral
 \end{itemize}
 \end{frame}
@@ -108,15 +117,76 @@ in a decentralized context. Here, the \textbf{permissionless} and
 \begin{frame}{Let's Explore}
 \begin{itemize}
     \item UniSwap: \url{https://app.uniswap.org/}
+    \item UniSwap Fees Collected: \url{https://dune.com/gammastrategies/Uniswap-v3-Volume-and-Fees-Collected}
     \item AAVE: \url{https://app.aave.com/markets/}
     \item ENS: \url{https://app.ens.domains/}
     \item Gitcoin: \url{https://impact.gitcoin.co/}
-    \item Tornado Cash: \url{https://tornado.cash/}
     \item MEV: \url{https://libmev.com/}
     \item Betting: \url{https://polymarket.com/}
     \item L2s: \url{https://l2beat.com/scaling/summary}
-    \item UniSwap Fees Collected: \url{https://dune.com/gammastrategies/Uniswap-v3-Volume-and-Fees-Collected}
     \item dApps: \url{https://www.growthepie.com/applications}
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Flashloans}
+Flashloans are a type of loan that allows you to borrow assets without
+collateral, as long as you return the assets within the same transaction.
+\bigskip
+
+Remember, it's ACID, so:
+\begin{itemize}
+\item User asks contract for a flashloan + provides functions to call
+\item Contract blindly executes the functions, with 1B+ USD in assets
+\item Contract checks that the loan is repaid at the end of the transaction
+\item If the loan is not repaid, the transaction is reverted
+\end{itemize}
+\smallskip
+
+Can be used for:
+\begin{itemize}
+    \item Arbitrage -- taking advantage of price difference between exchanges
+    \item Liquidation -- borrow, liquidate collateral, immediately sell, repay loan
+    \item Collateral swapping -- swapping collateral in a loan
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Flashloans -- Example}
+Example transaction:
+\url{https://app.blocksec.com/explorer/tx/eth/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a?line=5&debugLine=5}
+\bigskip
+
+Notice:
+\begin{itemize}
+    \item Flash loan function is \texttt{FlashLoanLogic.executeFlashLoanSimple}
+    \item User-defined action is executed in the \texttt{executeOperation}
+    \item Ends with \texttt{handleRepayment} which checks that the loan is repaid
+    \item Notice: \texttt{transferUnderlyingTo} was ran with 47352823905004708422332 wei -- currently around 140M USD
+    \item Repayment was 47376500316957210776543 wei -- difference is ~70K USD called the \texttt{premium}
+\end{itemize}
+\smallskip
+
+Etherscan:\url{https://etherscan.io/tx/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a}
+Net ``profit'' for the ``attacker'': ~7M USD
+\end{frame}
+
+\begin{frame}{Example: Tornado Cash}
+Tornado Cash is a privacy-focused smart contract that allows users to send
+ETH and ERC20 tokens anonymously. It uses zero-knowledge proofs to ensure that
+the sender and receiver addresses are not linked, while still allowing the
+network to verify that the transaction is valid.
+\begin{itemize}
+    \item Tornado Cash 0.1
+        ETH: \url{https://etherscan.io/address/0x12d66f87a04a9e220743712ce6d9bb1b5616b8fc}
+    \item Example:
+    \url{https://etherscan.io/tx/0x6d503e39f3a5cfe3736963685d7c49823a8b9de114d74331f4f44b99426cf4d5}
+    $\rightarrow$ Click ``decode input data''
+
+\item ZK proof: verifier can check that prover knows the secret without
+    revealing it
+\item Think of it as RSA: you can verify that someone knows the private key
+    without them revealing it.
 \end{itemize}
 \end{frame}
 
@@ -139,7 +209,6 @@ contracts are executed.
 
 
 \section{EVM}
-
 \begin{frame}{EVM}
 \begin{itemize}
     \item stack machine -- instead of registers, it uses a stack
@@ -366,9 +435,10 @@ Built-in:
 \end{itemize}
 \bigskip
 
-Remix URL: \url{https://https://remix.ethereum.org/}
+Remix URL: \url{https://remix.ethereum.org/}
 
 Simple project: \url{https://github.com/msooseth/remix-example}
+Check tests: \texttt{a.complicated(10,9)} could be made to fail.
 
 \end{frame}
 
@@ -399,7 +469,7 @@ Let's recreate the DAO hack in Remix!
 \end{enumerate}
 \end{frame}
 
-\section{What is a bug anyway?}
+\section{Testing and Verification}
 \begin{frame}{What is a bug anyway?}
 \begin{itemize}
     \item Steal the money due to e.g. overflow/reentrancy/logical error/etc bug
@@ -448,7 +518,7 @@ Tools in Ethereum:
 \end{itemize}
 \end{frame}
 
-\section{What is Symbolic Execution}
+\section{Symbolic Execution}
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution vs Fuzzing}
 Say your code is:
@@ -547,7 +617,7 @@ Purely symbolic execution-based systems:
 \end{frame}
 
 
-\section{Overview of hevm}
+\section{Our symbolic execution tool: hevm}
 \begin{frame}{Overview of hevm}
 \begin{itemize}
 \item Started $\approx7$ years ago as part of dapptools, but is now a standalone tool
@@ -1001,6 +1071,7 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 \end{frame}
 
 
+% \section{Results}
 % \begin{frame}[fragile=singleslide]{Results}
 % \small
 % To test and improve the performance of hevm, we use a benchmark repository [1] developed in conjunction with the Halmos team [2], and soon we will have the K framework contributing as well.
@@ -1011,24 +1082,19 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 % \end{frame}
 
 
+% \begin{frame}[fragile=singleslide]{Results}
+% We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks [1], on an AMD 5950x with 5min timeout,  and 128GB of RAM. For more details: $\rightarrow$ see paper!
+% {
+% \begin{center}
+% \includegraphics{cdf}
+% \end{center}
+% }
 
-\section{Results}
-
-\begin{frame}[fragile=singleslide]{Results}
-
-We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks [1], on an AMD 5950x with 5min timeout,  and 128GB of RAM. For more details: $\rightarrow$ see paper!
-{
-\begin{center}
-\includegraphics{cdf}
-\end{center}
-}
-
-[1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
-\end{frame}
+% [1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
+% \end{frame}
 
 
  \section{Conclusions}
-
  \begin{frame}[fragile=singleslide]{Limitations \& Future Work}
  hevm has a number of inherent limitations:
 
@@ -1052,7 +1118,6 @@ We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks
  \qquad \url{https://github.com/ethereum/hevm/releases}
  \end{frame}
 
-\section{Conclusions}
 \begin{frame}[fragile=singleslide]{Conclusions}
 
 hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and array/map-specific rewrites to lower the complexity of solving the final SMT expression.
