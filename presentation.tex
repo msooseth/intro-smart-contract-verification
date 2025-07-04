@@ -62,13 +62,14 @@ Immutable caveat: except when everyone agrees it should be undone$\ldots$ (see t
 \end{frame}
 
 \begin{frame}{Ethereum Blockhain}
+You can think of it as a very fancy transition system that is:
 \begin{itemize}
     \item \textbf{programmable} -- it can execute code, i.e. smart contracts (via EVM)
     \item \textbf{open-source} -- the code is available for anyone to inspect and contribute (via GitHub)
     \item \textbf{community-driven} -- the development is driven by the community (e.g. ACD meetings)
     \item \textbf{interoperable} -- it can interact with other blockchains and systems (via bridges)
-    \item \textbf{innovative} -- it is constantly evolving and improving (EIPs)
-    \item \textbf{TODO: scalable} -- it can handle a large number of transactions (via ZK/sharding)
+    \item \textbf{ever-evolving} -- it changes every ~6mo via ``hard-forks'' driven by EIPs
+    \item \textbf{scaling via L2s} -- used as a settlement layer for L2s: ZK, optimistic rollups
 \end{itemize}
 \bigskip
 
@@ -398,6 +399,21 @@ Let's recreate the DAO hack in Remix!
 \end{enumerate}
 \end{frame}
 
+\section{What is a bug anyway?}
+\begin{frame}{What is a bug anyway?}
+\begin{itemize}
+    \item Steal the money due to e.g. overflow/reentrancy/logical error/etc bug
+    \item Lock in the money due to liveness issues
+    \item Exploit incorrect rounding in online exchanges to get better prices
+    \item Borrow money to buy some asset, dump it in an automated market maker pushing its price to zero, then buy everything for zero.
+    \item Frontrunning: I can observe a transaction, see that it makes money, and replace the recipient of the transaction with my own address, so I get the money instead.
+    \item Sandwiching: I can see if someone is buying an asset, buy a lot of the asset before their transaction is executed, then sell it all off later for a higher price.
+\end{itemize}
+
+\bigskip
+And the list goes on. Some of these are ''clearly`` bugs. Some of them are abuse of systems (frontrunning). Most interesting oners are games played according to the rules, but not according to the spirit.
+\end{frame}
+
 \begin{frame}{The Testing Pyramid}
 \centering
 \includegraphics[scale=0.8]{triangle3}
@@ -544,14 +560,26 @@ Purely symbolic execution-based systems:
 \end{frame}
 
 
+\begin{frame}{hevm: How to define what's a bug?}
+\begin{itemize}
+    \item We decided NOT to enforce any ``opinions'' on what a bug is
+    \item Everything has to be specified by the user via an assertion
+    \item We don't have a specification language, unlike e.g. Certora Prover's CVL
+    \item The spec has to be expressed in-line code via require/assert
+    \item If used as a library, interface exists to specify pre/post-conditions
+\end{itemize}
+
+\bigskip
+This way we allow others to be opinionated, but we ourselves remain unopinionated.
+\end{frame}
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution: example}
 Say your code looks like this:
 \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
 function overflow(uint a) public pure {
-	uint b;
-	unchecked { b = a + 1;}
-	assert(b > a);
+  uint b;
+  unchecked { b = a + 1;}
+  assert(b > a);
 }
 \end{Verbatim}
 
@@ -637,6 +665,30 @@ Limitations:
 \begin{frame}{hevm internals}
 \centering
 \includegraphics[scale=0.6]{hevm-overview}
+\end{frame}
+
+
+\begin{frame}[fragile=singleslide]{Intermediate Representation}
+\small
+Through the symbolic execution engine we create an expression that captures all
+end-states. We then take each end-state out and filter it for things we are
+looking for, e.g. assertion failures. Let's take the example:
+
+\begin{Verbatim}[frame=single, framerule=0.2mm,framesep=2mm,fontsize=\small]
+function overflow(uint a) public pure {
+	uint b;
+	unchecked { b = a + 1;}
+	assert(b > a);
+}
+\end{Verbatim}
+
+The expression to generate a counterexamle for this could look like:
+
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+PLEq (Add (Var "a") (Lit 1)) (Var "a")
+\end{Verbatim}
+
+Notice: we use less-or-equal, because we want a \textbf{counterexample}
 \end{frame}
 
 
@@ -729,165 +781,136 @@ Limitations:
 %\draw [arrow2] (dec3) --node[anchor=south]{}  (pro3);
 %\draw [arrow]  (dec3) --node[anchor=north]{}   (pro4);
 
-%    \end{tikzpicture}
+%\end{tikzpicture}
 
 %\end{frame}
 
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Writes}
-% Writing in a buffer is represented as a chain of writes:
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-% AbstractBuf "a" // empty buffer
-% WriteWord (Lit 1) (Var "a") (AbstractBuf "a") //1st write
-% WriteWord (Lit 2) (Var "b") (WriteWord (Lit 1) (Var "a") (AbstractBuf "a")) //2nd
-% \end{Verbatim}
+ \begin{frame}[fragile=singleslide]{Intermediate Representation: Writes}
+ Writing in a buffer is represented as a chain of writes:
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+ AbstractBuf "a" // empty buffer
+ WriteWord (Lit 1) (Var "a") (AbstractBuf "a") //1st write
+ WriteWord (Lit 2) (Var "b") (WriteWord (Lit 1) (Var "a") (AbstractBuf "a")) //2nd
+ \end{Verbatim}
 
-% This can later be collapsed, e.g. in case the variables are concertized. We use \texttt{(AbstractBuf "var")} for symbolic, and \texttt{(ConcreteBuf "value")} for concrete values.
-% \bigskip
+ This can later be collapsed, e.g. in case the variables are concertized. We use \texttt{(AbstractBuf "var")} for symbolic, and \texttt{(ConcreteBuf "value")} for concrete values.
+ \bigskip
 
-% Allows us to simply prepend an operation for each instruction.
+ Allows us to simply prepend an operation for each instruction.
 
-% We later collapse \& simplify these writes.
-% \end{frame}
+ We later collapse \& simplify these writes.
+ \end{frame}
 
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Keccak}
-% Keccak, i.e. SHA-3 is used extensively by all contracts. This is because \textbf{storage of contracts is an unstructured array} of uint256. Hence, to implement e.g. maps and an arrays, one needs to use Keccak to map to a "random" position in storage, so as not to clash.
-% \bigskip
+ \begin{frame}[fragile=singleslide]{Intermediate Representation: Keccak}
+ Keccak, i.e. SHA-3 is used extensively by all contracts. This is because \textbf{storage of contracts is an unstructured array} of uint256. Hence, to implement e.g. maps and an arrays, one needs to use Keccak to map to a "random" position in storage, so as not to clash.
+ \bigskip
 
-% It's very expensive to accurately represent Keccak in SMT. Hence, we represent Keccak as an \textbf{uninterpreted function} in SMT, with the following rules:
-% \begin{itemize}
-% \item We know the concrete value of the input $\rightarrow$ we add the axiom $keccak(input)=output$
-% \item Size of input differs $\rightarrow$ hash differs. We assert this for all pairs
-% \item Assert all pairs of keccak to be unequal if they don't match over \emph{partial} concrete values
-% \item $keccak(x) > 128$. Small slot values are used for non-map/array elements of contracts
-% \end{itemize}
-% \end{frame}
-%
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Maps}
-% Storage of contracts is an unstructured array of uint256. Solidity uses: $keccak (bytes32(key) || bytes32(id))$ to map $mymap[key]$ where $id$ is the map index:
+ It's very expensive to accurately represent Keccak in SMT. Hence, we represent Keccak as an \textbf{uninterpreted function} in SMT, with the following rules:
+ \begin{itemize}
+ \item We know the concrete value of the input $\rightarrow$ we add the axiom $keccak(input)=output$
+ \item Size of input differs $\rightarrow$ hash differs. We assert this for all pairs
+ \item Assert all pairs of keccak to be unequal if they don't match over \emph{partial} concrete values
+ \item $keccak(x) > 128$. Small slot values are used for non-map/array elements of contracts
+ \end{itemize}
+ \end{frame}
 
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-% contract C {
-%     mapping(uint => uint) map_id_0;
-%     mapping(uint => uint) map_id_1;
-% }
-% \end{Verbatim}
-% We have Solidity-specific rewrite rules to strip writes. So when writing two $keccak (bytes32(key) || bytes32(id))$-s on top of each other, and then reading, we traverse the list of writes to pick out the potentially matching one(s).
-% \bigskip
+ \begin{frame}[fragile=singleslide]{Intermediate Representation: Maps}
+ Storage of contracts is an unstructured array of uint256. Solidity uses: $keccak (bytes32(key) || bytes32(id))$ to map $mymap[key]$ where $id$ is the map index:
 
-% Notice that the SMT solver can use our Keccak rules to do this, too, but it's a lot slower
-% \end{frame}
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+ contract C {
+     mapping(uint => uint) map_id_0;
+     mapping(uint => uint) map_id_1;
+ }
+ \end{Verbatim}
+ We have Solidity-specific rewrite rules to strip writes. So when writing two $keccak (bytes32(key) || bytes32(id))$-s on top of each other, and then reading, we traverse the list of writes to pick out the potentially matching one(s).
+ \bigskip
 
-%% DEVCON maybe add?
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Simplification}
-% We do all the following rewrites to fixedpoint:
-% \begin{itemize}
-% \item Constant folding
-% \item Canonicalization of all commutative operators (concrete value first)
-% \item Canonicalization of all less-than/greater-than/etc operators
-% \item Canonicalization of all Keccak expressions to match Solidity patterns
-% \item Stripping writes when they are not read
-% \item Stripping reads when they are not used
-% \item (In)equality propagation
-% \item All meaningful rewrites, such as min/max/add+sub/add+add/sub+sub/etc.
-% \item Special rewrite rules for array/map lookups and other Solidity patterns
-% \end{itemize}
-% \end{frame}
+ Notice that the SMT solver can use our Keccak rules to do this, too, but it's a lot slower
+ \end{frame}
 
-% \begin{frame}[fragile=singleslide]{Intermediate Representation: Haskell to the Rescue}
+% DEVCON maybe add?
+ \begin{frame}[fragile=singleslide]{Intermediate Representation: Simplification}
+ We do all the following rewrites to fixedpoint:
+ \begin{itemize}
+ \item Constant folding
+ \item Canonicalization of all commutative operators (concrete value first)
+ \item Canonicalization of all less-than/greater-than/etc operators
+ \item Canonicalization of all Keccak expressions to match Solidity patterns
+ \item Stripping writes when they are not read
+ \item Stripping reads when they are not used
+ \item (In)equality propagation
+ \item All meaningful rewrites, such as min/max/add+sub/add+add/sub+sub/etc.
+ \item Special rewrite rules for array/map lookups and other Solidity patterns
+ \end{itemize}
+ \end{frame}
 
-% Haskell supports algebraic data types (ADTs), so our intermediate representation (IR) can be fully typed. Furthermore, Haskell supports pattern matching, so our rewrite rules are easy to read \& write:
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-%     -- syntactic Eq reduction
-%     go (Eq (Lit a) (Lit b))
-%       | a == b = Lit 1
-%       | otherwise = Lit 0
-%     go (Eq (Lit 0) (Sub a b)) = eq a b
-%     go (Eq a b)
-%       | a == b = Lit 1
-%       | otherwise = eq a b
-% \end{Verbatim}
-% \end{frame}
+ \begin{frame}[fragile=singleslide]{Intermediate Representation: Haskell to the Rescue}
 
-% \begin{frame}[fragile=singleslide]{What can we use the IR for?}
-% \begin{itemize}
-% \item Finding counterexamples with SMT solvers
-% \item Constant extraction: helping other fuzzers with "magic numbers"
-% \item Substitute constants and fold: we can build a fuzzer
-% \item Not just failing branches: automated test-case generation
-% \end{itemize}
+ Haskell supports algebraic data types (ADTs), so our intermediate representation (IR) can be fully typed. Furthermore, Haskell supports pattern matching, so our rewrite rules are easy to read \& write:
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+     -- syntactic Eq reduction
+     go (Eq (Lit a) (Lit b))
+       | a == b = Lit 1
+       | otherwise = Lit 0
+     go (Eq (Lit 0) (Sub a b)) = eq a b
+     go (Eq a b)
+       | a == b = Lit 1
+       | otherwise = eq a b
+ \end{Verbatim}
+ \end{frame}
 
-% \end{frame}
+ \begin{frame}[fragile=singleslide]{What can we use the IR for?}
+ \begin{itemize}
+ \item Finding counterexamples with SMT solvers
+ \item Constant extraction: helping other fuzzers with "magic numbers"
+ \item Substitute constants and fold: we can build a fuzzer
+ \item Not just failing branches: automated test-case generation
+ \end{itemize}
 
-% \begin{frame}[fragile=singleslide]{Solving the IR: Creating a Fuzzer}
+ \end{frame}
 
-% Fuzzing sounds strange given that hevm is a symbolic execution engine. However:
-% \begin{itemize}
-% \item The IR is actually a very clean representation of the problem at hand
-% \item Due to the extensive simplifications applied, it can contain specific constants that may be very hard to find otherwise
-% \item IR \emph{could} be transpiled to assembly (potentially through \texttt{C}), and executed as a program
-% \end{itemize}
-% \bigskip
+ \begin{frame}[fragile=singleslide]{Solving the IR: Creating a Fuzzer}
 
-% Notice that geth, the normal EVM concrete executor is incredibly slow. Hence a transpiled IR could achieve serious speedup.
+ Fuzzing sounds strange given that hevm is a symbolic execution engine. However:
+ \begin{itemize}
+ \item The IR is actually a very clean representation of the problem at hand
+ \item Due to the extensive simplifications applied, it can contain specific constants that may be very hard to find otherwise
+ \item IR \emph{could} be transpiled to assembly (potentially through \texttt{C}), and executed as a program
+ \end{itemize}
+ \bigskip
 
-% \end{frame}
+ Notice that geth, the normal EVM concrete executor is incredibly slow. Hence a transpiled IR could achieve serious speedup.
 
-% \begin{frame}[fragile=singleslide]{Solving the IR: using an SMT Solver}
-% The IR is translated in a straightforward manner to SMT. Let's say the expression is:
+ \end{frame}
 
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
-% PLEq (Add (Var "a") (Lit 1)) (Var "a")
-% \end{Verbatim}
+ \begin{frame}[fragile=singleslide]{Solving the IR: using an SMT Solver}
+ The IR is translated in a straightforward manner to SMT. Let's say the expression is:
 
-% The SMT expression for this could be:
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+ PLEq (Add (Var "a") (Lit 1)) (Var "a")
+ \end{Verbatim}
 
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
-% (set-logic QF_AUFBV)
-% (define-sort Word () (_ BitVec 256))
-% (declare-const varA (Word))
-% (assert (bvule (bvadd varA (_ bv1 256)) varA))
-% (check-sat)
-% \end{Verbatim}
+ The SMT expression for this could be:
 
-% Z3 gives the answer:
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+ (set-logic QF_AUFBV)
+ (define-sort Word () (_ BitVec 256))
+ (declare-const varA (Word))
+ (assert (bvule (bvadd varA (_ bv1 256)) varA))
+ (check-sat)
+ \end{Verbatim}
 
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
-% sat
-% (
-%   (define-fun varA () (_ BitVec 256)
-%     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
-% )
-% \end{Verbatim}
-% \end{frame}
+ Z3 gives the answer:
 
-\section{What is a bug anyway?}
-\begin{frame}{What is a bug anyway?}
-\begin{itemize}
-    \item I can steal the money due to e.g. overflow/reentrancy/logical error/etc bug
-    \item I can lock in the money due to liveness issues
-    \item I can exploit incorrect rounding in online exchanges to get better prices
-    \item I can borrow money to buy some asset, dump it in an automated market maker pushing its price to zero, then buy everything for zero.
-    \item Frontrunning: I can observe a transaction, see that it makes money, and replace the recipient of the transaction with my own address, so I get the money instead.
-    \item Sandwiching: I can see if someone is buying an asset, buy a lot of the asset before their transaction is executed, then sell it all off later for a higher price.
-\end{itemize}
-
-\bigskip
-And the list goes on. Some of these are ''clearly`` bugs. Some of them are abuse of systems (frontrunning). Most interesting oners are games played according to the rules, but not according to the spirit.
-\end{frame}
-
-\begin{frame}{What is a bug anyway? (cont.)}
-\begin{itemize}
-    \item We decided NOT to enforce any bug specification
-    \item Everything has to be specified by the user via an assertion
-    \item So we don't have a specification language
-    \item The spec has to be expressed in-line code via require/assert
-    \item We provide an interface where it's possible to specify pre/post-conditions
-    \item Separate tool is in the works that adds pre/post conditions to prevent the above
-\end{itemize}
-
-\bigskip
-This way we allow others to be opinionated, but we ourselves remain unopinionated.
-\end{frame}
+ \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+ sat
+ (
+   (define-fun varA () (_ BitVec 256)
+     #xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+ )
+ \end{Verbatim}
+ \end{frame}
 
 \section{Correctness}
 \begin{frame}{How we ensure correctness of hevm}
@@ -895,21 +918,34 @@ This way we allow others to be opinionated, but we ourselves remain unopinionate
     \item Concrete execution checked via eth test suite
     \item Over 100 unit test for internal components (e.g. IR simplifications)
     \item Over 100 end-to-end tests for symbolic execution
-    \item IR simplification checked via: generate IR via quickcheck $\rightarrow$ simplify IR $\rightarrow$ translate original IR and simplified IR to SMT, equivalence check $\rightarrow$ must be UNSAT
-    \item Symbolic execution checked via: random conctract generator $\rightarrow$ symbolic execution $\rightarrow$ concrete input $\rightarrow$ constant folding vs geth + concrete input $\rightarrow$ final state
-    \item Curated set of symbolic test cases checked against kontrol (KEVM) and halmos
+    \item IR simplification checked via: generate IR via quickcheck
+        $\rightarrow$ simplify IR $\rightarrow$ translate original IR and
+        simplified IR to SMT, equivalence check $\rightarrow$ must be UNSAT
+    \item Symbolic execution checked via: random conctract generator
+        $\rightarrow$ symbolic execution $\rightarrow$ concrete input
+        $\rightarrow$ constant folding vs geth + concrete input $\rightarrow$
+        final state
+    \item Curated set of symbolic test cases checked against kontrol (KEVM) and
+        halmos
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Bugs, issues, and inconveniences}
 \begin{itemize}
     \item The IR $\rightarrow$ SMT translation was incorrect, it sometimes produced trivially UNSAT queries
-    \item Now we check if a != a' --- if it's also UNSAT, we know our translation is buggy
-    \item IR was not canonical, so two identical expressions could be different in IR, due to missing commutativity and associativity rewrites
-    \item geth behaviour is undefined for large ($>2^{64}$) memory usage, so memory overflow simplifications can be unsound
-    \item $\ldots$ so in fact some behaviour is undefined, but this is only a problem for compliers and symbolic execution systems
-    \item Since storage is limited, we have to limit counterexample sizes -- certain optimizations exploit limited memory
-    \item Once our tool started to be used by a larger tool, Echidna, in symbolic execution mode, a lot of edge-cases had to be dealt with via soft errors
+    \item Now we check if a != a' --- if it's also UNSAT, we know our
+        translation is buggy
+    \item IR was not canonical, so two identical expressions could be different
+        in IR, due to missing commutativity and associativity rewrites
+    \item geth behaviour is undefined for large ($>2^{64}$) memory usage, so
+        memory overflow simplifications can be unsound
+    \item $\ldots$ so in fact some behaviour is undefined, but this is only a
+        problem for compliers and symbolic execution systems
+    \item Since storage is limited, we have to limit counterexample sizes --
+        certain optimizations exploit limited memory
+    \item Once our tool started to be used by a larger tool, Echidna, in
+        symbolic execution mode, a lot of edge-cases had to be dealt with via
+        soft errors
 \end{itemize}
 \end{frame}
 
@@ -922,8 +958,7 @@ hevm user guide: \url{https://hevm.dev/}
 
 Code: \qquad \qrcode[height=1in]{https://github.com/ethereum/hevm/}
 \qquad \qquad \qquad Paper: \qquad \qrcode[height=1in]{https://dl.acm.org/doi/10.1007/978-3-031-65627-9_22}
-
-% \bigskip
+\end{frame}
 
 % Pro tips:
 % \begin{itemize}
@@ -940,130 +975,105 @@ Code: \qquad \qrcode[height=1in]{https://github.com/ethereum/hevm/}
 %     % \item If you encounter a bug, don't be afraid to report it as a GitHub issue
 % \end{itemize}
 
-% \bigskip
+\begin{frame}[fragile=singleslide]{Contributing Back to hevm}
+The hevm repository uses \texttt{nix} for ease of development:
 
-% Contributing: All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressive language
+You now have a full development environment, with all necessary tools
+installed, including Z3.
+\bigskip
+
+hevm is written in Haskell, but there are many areas that can be contributed to
+without deep knowledge of Haskell. For example, expression simplification:
+
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+    go (Add a b)
+      | b == (Lit 0) = a
+      | a == (Lit 0) = b
+      | otherwise = add a b
+\end{Verbatim}
+
+All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressive language
 \end{frame}
+
 
 \begin{frame}{Thank you for your time!}
     Thanks for listening!
 \end{frame}
 
 
-%\begin{frame}[fragile=singleslide]{Results}
-%\small
-%To test and improve the performance of hevm, we use a benchmark repository [1] developed in conjunction with the Halmos team [2], and soon we will have the K framework contributing as well.
-%
-%\includegraphics[scale=0.75]{boxchart}
-%[1] \url{https://github.com/eth-sc-comp/benchmarks/}
-%[2] \url{https://github.com/a16z/halmos}
-%\end{frame}
-
-
-%\begin{frame}[fragile=singleslide]{Contributing Back to hevm}
-%
-%The hevm repository uses \texttt{nix} for ease of development:
-%
-%
-%
-%You now have a full development environment, with all necessary tools installed, including Z3.
-%\bigskip
-%
-%hevm is written in Haskell, but there are many areas that can be contributed to without deep knowledge of Haskell. For example, expression simplification:
-%
-%\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
-%    go (Add a b)
-%      | b == (Lit 0) = a
-%      | a == (Lit 0) = b
-%      | otherwise = add a b
-%\end{Verbatim}
-%\end{frame}
-
-% \section{Results}
-
 % \begin{frame}[fragile=singleslide]{Results}
-
-% We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks [1], on an AMD 5950x with 5min timeout,  and 128GB of RAM. For more details: $\rightarrow$ see paper!
-% {
-% \begin{center}
-% \includegraphics{cdf}
-% \end{center}
-% }
-
-
-% [1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
-% \end{frame}
-
-
-% \section{Conclusions}
-
-% \begin{frame}[fragile=singleslide]{Limitations \& Future Work}
-% hevm has a number of inherent limitations:
-
-% \begin{itemize}
-% \item Loops are challenging. We have an iteration limit until which loops are examined
-% \item Recursion, and parametric calls can cause hevm to only partially explore the state
-% \item Complicated mathematical expressions (e.g. division, modulo) can cause a challenge
-% \item hevm is not verified, and neither are SMT solvers
-% \end{itemize}
-% \vspace{2ex}
-
-% Future work:
-% \begin{itemize}
-% \item Symbolic CopySlice handling -- I finally have an idea :)
-% \item Better handling of loops and recursion: include into IR, and solve for invariant via CHC
-% \end{itemize}
-
-% \bigskip
-
-% \quad  \qrcode[height=1cm]{https://github.com/ethereum/hevm/releases}
-% \qquad \url{https://github.com/ethereum/hevm/releases}
-
-% \end{frame}
-
-%\section{Conclusions}
-%\begin{frame}[fragile=singleslide]{Conclusions}
-%
-%hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and array/map-specific rewrites to lower the complexity of solving the final SMT expression.
-%\bigskip
-%
-%%Download hevm from \url{https://github.com/ethereum/hevm/releases}
-%%\bigskip
-%%\qrcode{https://github.com/ethereum/hevm/releases}
-%
-%Development environment:
-%\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
-%sh <(curl -L https://nixos.org/nix/install) --daemon
-%git clone https://github.com/ethereum/hevm/
-%nix-shell
-%cabal repl test
-%[...]
-%> :main
-%\end{Verbatim}
-%
-%\end{frame}
-
-
-% \begin{frame}[fragile=singleslide]{Intermediate Representation}
 % \small
+% To test and improve the performance of hevm, we use a benchmark repository [1] developed in conjunction with the Halmos team [2], and soon we will have the K framework contributing as well.
 
-% Through the symbolic execution engine we create an expression that captures all end-states. We then take each end-state out and filter it for things we are looking for, e.g. assertion failures. Let's take the example:
-
-% \begin{Verbatim}[frame=single, framerule=0.2mm,framesep=2mm,fontsize=\small]
-% function overflow(uint a) public pure {
-% 	uint b;
-% 	unchecked { b = a + 1;}
-% 	assert(b > a);
-% }
-% \end{Verbatim}
-
-% The expression to generate a counterexamle for this could look like:
-
-% \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-% PLEq (Add (Var "a") (Lit 1)) (Var "a")
-% \end{Verbatim}
-
-% Notice: we use less-or-equal, because we want a \textbf{counterexample}
+% \includegraphics[scale=0.75]{boxchart}
+% [1] \url{https://github.com/eth-sc-comp/benchmarks/}
+% [2] \url{https://github.com/a16z/halmos}
 % \end{frame}
+
+
+
+\section{Results}
+
+\begin{frame}[fragile=singleslide]{Results}
+
+We ran latest hevm, halmos, and kontrol (KEVM) on the Eth-SC Ethereum benchmarks [1], on an AMD 5950x with 5min timeout,  and 128GB of RAM. For more details: $\rightarrow$ see paper!
+{
+\begin{center}
+\includegraphics{cdf}
+\end{center}
+}
+
+[1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
+\end{frame}
+
+
+ \section{Conclusions}
+
+ \begin{frame}[fragile=singleslide]{Limitations \& Future Work}
+ hevm has a number of inherent limitations:
+
+ \begin{itemize}
+ \item Loops are challenging. We have an iteration limit until which loops are examined
+ \item Recursion, and parametric calls can cause hevm to only partially explore the state
+ \item Complicated mathematical expressions (e.g. division, modulo) can cause a challenge
+ \item hevm is not verified, and neither are SMT solvers
+ \end{itemize}
+ \vspace{2ex}
+
+ Future work:
+ \begin{itemize}
+ \item Symbolic CopySlice handling -- I finally have an idea :)
+ \item Better handling of loops and recursion: include into IR, and solve for invariant via CHC
+ \end{itemize}
+
+ \bigskip
+
+ \quad  \qrcode[height=1cm]{https://github.com/ethereum/hevm/releases}
+ \qquad \url{https://github.com/ethereum/hevm/releases}
+ \end{frame}
+
+\section{Conclusions}
+\begin{frame}[fragile=singleslide]{Conclusions}
+
+hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and array/map-specific rewrites to lower the complexity of solving the final SMT expression.
+\bigskip
+
+%Download hevm from \url{https://github.com/ethereum/hevm/releases}
+%\bigskip
+%\qrcode{https://github.com/ethereum/hevm/releases}
+
+Development environment:
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+sh <(curl -L https://nixos.org/nix/install) --daemon
+git clone https://github.com/ethereum/hevm/
+nix-shell
+cabal repl test
+[...]
+> :main
+\end{Verbatim}
+
+\end{frame}
+
+
 
 \end{document}
