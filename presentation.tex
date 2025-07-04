@@ -571,13 +571,16 @@ Consensus:
 \begin{itemize}
     \item Frontrunning: observe a money-making transaction, replace the
         recipient of the transaction with my own address
-    \item Sandwiching: I can see if someone is buying an asset, buy a lot of
-        the asset before their transaction is executed, then sell it all off
-        later for a higher price.
+    \item
+        \bluelink{https://etherscan.io/tx/0xee9fcd2b9996e96b642cb4cda47fc140f98fdaf07ee02657743d4bfcc4670106}{Sandwiching}: see someone is buying an asset, buy a lot of
+    the asset before their transaction is executed, then sell it all off
+    later for a higher price. Block is
+    \bluelink{https://etherscan.io/txs?block=22029771}{here}, observe the \texttt{MEV Bot}
+    before and after the \texttt{0xee9fc} transaction.
 \end{itemize}
 
 \bigskip
-And the list goes on. Some of these are ''clearly`` bugs. Some of them are abuse of systems (frontrunning). Most interesting oners are games played according to the rules, but not according to the spirit.
+Some of these are ''clearly`` bugs. Some of them are abuse of systems(frontrunning). Some are games played according to the rules, but perhaps not according to the spirit.
 \end{frame}
 
 \begin{frame}{The Testing Pyramid}
