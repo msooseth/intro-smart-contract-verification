@@ -41,7 +41,6 @@ A gentle introduction to formal verification of Ethereum smart contracts}
 \date{9th of July 2025}
 \subtitle{Brussels 4th Summer School on Security Testing and Verification}
 
-
 \begin{document}
 \begin{frame}
     \titlepage
@@ -1133,7 +1132,7 @@ Notice: we use less-or-equal, because we want a \textbf{counterexample}
 \begin{lstlisting}[language=smtlib]
  (set-logic QF_AUFBV)
  (define-sort Word () (_ BitVec 256))
- (declare-fun varA (Word))
+ (declare-const varA (Word))
  (assert (bvule (bvadd varA (_ bv1 256)) varA))
  (check-sat)
  (get-model)
@@ -1250,21 +1249,6 @@ Code: \qquad \qrcode[height=1in]{https://github.com/ethereum/hevm/}
 \qquad \qquad \qquad Paper: \qquad \qrcode[height=1in]{https://dl.acm.org/doi/10.1007/978-3-031-65627-9_22}
 \end{frame}
 
-% Pro tips:
-% \begin{itemize}
-%     \item Equivalence testing can be a useful way to check if a refactoring is correct
-%     \item The spec of your contract is effectively its set of test cases
-%     \item Write \textbf{postive, negative, and invariant} tests. Ex:
-%         \begin{itemize}
-%             \item Positive test: required number of signatures are met, transfer allowed
-%             \item Negative test: required number of signatures are not met, transfer not allowed
-%             \item Invariant test: after transfer, sum of balances is the same
-%         \end{itemize}
-%     \item Even if ``hevm test'' emits warnings, it still adds a level of assurance beyond pure fuzzing
-%     % \item Think of hevm as a tool in your toolbox
-%     % \item If you encounter a bug, don't be afraid to report it as a GitHub issue
-% \end{itemize}
-
 \begin{frame}[fragile=singleslide]{Contributing Back to hevm}
 The hevm repository uses \texttt{nix} for ease of development:
 
@@ -1324,14 +1308,9 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 
  Future work:
  \begin{itemize}
- \item Symbolic CopySlice handling -- I finally have an idea :)
+ \item Symbolic CopySlice handling
  \item Better handling of loops and recursion: include into IR, and solve for invariant via CHC
  \end{itemize}
-
- \bigskip
-
- \quad  \qrcode[height=1cm]{https://github.com/ethereum/hevm/releases}
- \qquad \url{https://github.com/ethereum/hevm/releases}
  \end{frame}
 
 \begin{frame}[fragile=singleslide]{Conclusions}
@@ -1357,7 +1336,7 @@ cabal repl test
 \end{frame}
 
 \begin{frame}{Thank you for your time!}
-    Thanks for listening!
+    Any questions?
 \end{frame}
 
 \end{document}
