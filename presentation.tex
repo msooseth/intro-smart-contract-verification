@@ -65,8 +65,8 @@ A gentle introduction to formal verification of Ethereum smart contracts}
 
 \tiny
 Illustration from: \url{takenobu-hs/ethereum-evm-illustrated}, BSD License
-
 \end{frame}
+
 \begin{frame}{What is a Blockchain -- Block}
 \begin{center}
 \includegraphics[scale=0.5]{blockchain}
@@ -77,7 +77,6 @@ Illustration from: \url{takenobu-hs/ethereum-evm-illustrated}, BSD License
 Illustration from: \url{takenobu-hs/ethereum-evm-illustrated}, BSD License
 \end{frame}
 
-\end{frame}
 \begin{frame}{What is a Blockchain -- Consensus}
 \begin{center}
 \includegraphics[scale=0.5]{world-state}
@@ -509,13 +508,22 @@ Let's recreate the DAO hack in Remix!
 
 \section{Testing and Verification}
 \begin{frame}{What is a bug anyway?}
+
+EVM:
 \begin{itemize}
     \item Steal the money due to e.g. overflow/reentrancy/logical error/etc bug
     \item Lock in the money due to liveness issues
-    \item Exploit incorrect rounding in online exchanges to get better prices
+    \item Exploit incorrect rounding in online exchanges to drain contract
     \item Borrow money to buy some asset, dump it in an automated market maker pushing its price to zero, then buy everything for zero.
-    \item Frontrunning: I can observe a transaction, see that it makes money, and replace the recipient of the transaction with my own address, so I get the money instead.
-    \item Sandwiching: I can see if someone is buying an asset, buy a lot of the asset before their transaction is executed, then sell it all off later for a higher price.
+\end{itemize}
+
+Consensus:
+\begin{itemize}
+    \item Frontrunning: observe a money-making transaction, replace the
+        recipient of the transaction with my own address
+    \item Sandwiching: I can see if someone is buying an asset, buy a lot of
+        the asset before their transaction is executed, then sell it all off
+        later for a higher price.
 \end{itemize}
 
 \bigskip
@@ -550,14 +558,28 @@ And the list goes on. Some of these are ''clearly`` bugs. Some of them are abuse
 You just had a long lecture so I won't go into details :)
 Tools in Ethereum:
 \begin{itemize}
-    \item \textbf{Echidna}: Coverage-guided fuzzer for Ethereum smart contracts, via hevm
-    \item \textbf{Forge}: Built-in fauzzer as part of Foundry, only recently coverage-guided, via reth
-    \item \textbf{Medusa}: Fuzzer for Ethereum smart contracts based on geth
+    \item \textbf{Echidna}: Coverage-guided fuzzer for Ethereum smart contracts, via \textbf{hevm}
+    \item \textbf{Forge}: Built-in fauzzer as part of Foundry, only recently coverage-guided, via \textbf{reth}
+    \item \textbf{Medusa}: Fuzzer for Ethereum smart contracts via fork of \textbf{geth}
+\end{itemize}
+\bigskip
+
+Why specialized execution engines? Because we need:
+\begin{itemize}
+    \item \textbf{Cheat Codes} -- special functions to manipulate the world
+        state: \url{https://getfoundry.sh/reference/cheatcodes/environment}
+    \begin{itemize}
+        \item \textbf{deal} -- gives ETH to an address
+        \item \textbf{prank} -- changes the sender of the transaction
+        \item \textbf{roll} -- changes the block number
+        \item \textbf{...}
+    \end{itemize}
+    \item \textbf{Coverage Metrics} -- we need to know which parts of the code
+        were executed
 \end{itemize}
 \end{frame}
 
 \section{Symbolic Execution}
-
 \begin{frame}[fragile=singleslide]{Symbolic Execution vs Fuzzing}
 Say your code is:
 
@@ -641,14 +663,19 @@ For symbolic execution, we end up having to follow two executions. This can beco
 
 \begin{frame}{Related Work}
 
-Symbolic execution is used in two major ways. One is to \textbf{validate static code analysis} results, the other is \textbf{pure symbolic execution}. The first approach is followed by Oyente, sCompile, Mythril, etc. These are typically incomplete, and false positives are allowed.
+Symbolic execution is used in two major ways. One is to \textbf{validate static
+code analysis} results, the other is \textbf{pure symbolic execution}. The
+first approach is followed by Oyente, sCompile, Mythril, etc. These are
+typically incomplete, and false positives are allowed.
 
 \bigskip
 
 Purely symbolic execution-based systems:
 \begin{itemize}
-\item \textbf{halmos}: Written in python, with its own IR and internal rewrite engine
-\item \textbf{Certora Prover}: Based on backwards exploration and weakest precondition computation
+\item \textbf{halmos}: Written in python, with its own IR and internal rewrite
+    engine
+\item \textbf{Certora Prover}: Based on backwards exploration and weakest
+    precondition computation, uses CVL specification language
 \item \textbf{KEVM}: K-framework based, allows to ``break out'' into K to prove lemmas
 \item \textbf{EthBMC}: Bounded model checking-based exploration of contracts
 \end{itemize}
@@ -671,7 +698,6 @@ Purely symbolic execution-based systems:
 \begin{frame}{hevm: How to define what's a bug?}
 \begin{itemize}
     \item We decided NOT to enforce any ``opinions'' on what a bug is
-    \item Everything has to be specified by the user via an assertion
     \item We don't have a specification language, unlike e.g. Certora Prover's CVL
     \item The spec has to be expressed in-line code via require/assert
     \item If used as a library, interface exists to specify pre/post-conditions
@@ -679,6 +705,9 @@ Purely symbolic execution-based systems:
 
 \bigskip
 This way we allow others to be opinionated, but we ourselves remain unopinionated.
+
+But: it misses the ability to express some invariants, e.g. ``total balance of
+all accounts should not change''.
 \end{frame}
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution: example}
@@ -691,15 +720,15 @@ function overflow(uint a) public pure {
 }
 \end{Verbatim}
 
-
-hevm can find the case where $a=0xffffff\ldots$ to trigger the assert due to roll-around. hevm gives you the \textbf{exact call to reproduce the bug}. This way of using hevm can find a \emph{known-bad state}.
-
+hevm can find the case where $a=0xffffff\ldots$ to trigger the assert due to
+roll-around. hevm gives you the \textbf{exact call to reproduce the bug}. This
+way of using hevm can find a \emph{known-bad state}.
 \end{frame}
 
 
-
 \begin{frame}[fragile=singleslide]{Symbolic Execution: Invariant Checking}
-You can describe \textbf{invariants} of your contract and write them as functions Then assert these functions every time the invariant must hold.
+You can describe \textbf{invariants} of your contract and write them as
+functions Then assert these functions every time the invariant must hold.
 \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
 function my_invariant() private pure returns inv {
 	inv = ...calculate invariant...
@@ -712,7 +741,8 @@ function transfer(uint a) public pure {
 }
 \end{Verbatim}
 
-Here, instead of a known-bad state, we validate that we are always in state that matches our expectations.
+Here, instead of a known-bad state, we validate that we are always in state
+that matches our expectations.
 \end{frame}
 
 \begin{frame}{hevm: Symbolic Execution for Counterexample Generation}
@@ -726,30 +756,30 @@ Here, instead of a known-bad state, we validate that we are always in state that
 \end{frame}
 %
 %
-%\begin{frame}[fragile=singleslide]{hevm: Symbolic Execution for Equivalence Checking}
-%You can ask hevm to check whether two implementations are equivalent
-%\bigskip
-%\\
-%
-%\begin{minipage}[b]{0.45\textwidth}
-%\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-%function (...) public returns x {
-%  x = /known good computation/
-%      /uses lots of gas/
-%}
-%    \end{Verbatim}
-%  \end{minipage}
-%  \begin{minipage}[b]{0.45\textwidth}
-%  \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
-%function (...) public returns x {
-%  x = /complicated computation/
-%      /uses less gas/
-%}
-%\end{Verbatim}
-%\end{minipage}
-%
-%hevm can give the exact \textbf{call to trigger the discrepancy} between the two functions. This way, you can safely improve the gas performance of your code.
-%\end{frame}
+\begin{frame}[fragile=singleslide]{hevm: Symbolic Execution for Equivalence Checking}
+You can ask hevm to check whether two implementations are equivalent
+\bigskip
+\\
+
+\begin{minipage}[b]{0.45\textwidth}
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+function (...) public returns x {
+  x = //known good computation
+      //uses lots of gas
+}
+    \end{Verbatim}
+  \end{minipage}
+  \begin{minipage}[b]{0.45\textwidth}
+  \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
+function (...) public returns x {
+  x = //complicated computation
+      //uses less gas/
+}
+\end{Verbatim}
+\end{minipage}
+
+hevm can give the exact \textbf{call to trigger the discrepancy} between the two functions. This way, you can safely improve the gas performance of your code.
+\end{frame}
 
 \begin{frame}{hevm's Symbolic Executor}
 hevm's symbolic executor is very powerful:
@@ -800,93 +830,93 @@ Notice: we use less-or-equal, because we want a \textbf{counterexample}
 \end{frame}
 
 
-\begin{frame}[fragile=singleslide]{Intermediate Representation}
+%\begin{frame}[fragile=singleslide]{Intermediate Representation}
 
-\begin{tikzpicture}[node distance=2cm]
-\centering
-\tiny
-%ITE node
+%\begin{tikzpicture}[node distance=2cm]
+%\centering
+%\tiny
+%%ITE node
 
-%the source code
-\node (program) [text width=27em, code]
-{\begin{lstlisting}[numbers=none]
-contract MyContract {
-  mapping(uint => uint) items;
-  function test(uint val1) public {
-    require(val1 > 10);
-    unchecked {
-      items[4] = val1+1;
-      assert(items[4] > 10); } } }
-\end{lstlisting}
-};
+%%the source code
+%\node (program) [text width=27em, code]
+%{\begin{lstlisting}[numbers=none]
+%contract MyContract {
+%  mapping(uint => uint) items;
+%  function test(uint val1) public {
+%    require(val1 > 10);
+%    unchecked {
+%      items[4] = val1+1;
+%      assert(items[4] > 10); } } }
+%\end{lstlisting}
+%};
 
-\node (dec1) [right of=program, xshift=6.5cm, decision]
-{\begin{lstlisting}[numbers=none]
-(ITE (IsZero TxValue)) ...
-\end{lstlisting}};
+%\node (dec1) [right of=program, xshift=6.5cm, decision]
+%{\begin{lstlisting}[numbers=none]
+%(ITE (IsZero TxValue)) ...
+%\end{lstlisting}};
+
+%%% left of that:
+%\node (pro1) [process, below of=program, yshift=0.3cm]
+%{\begin{lstlisting}[numbers=none]
+%(Failure Error: Revert)
+%  Assertions:
+%    (PEq (IsZero TxValue) 0 )
+%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
+%\end{lstlisting}};
+
+%% ITE node after:
+%\node (dec2) [decision, below of=dec1, yshift=0.5cm]
+%{\begin{lstlisting}[numbers=none]
+%ITE (LT 10 (Var "arg1")) ...
+%\end{lstlisting}};
 
 %% left of that:
-\node (pro1) [process, below of=program, yshift=0.3cm]
-{\begin{lstlisting}[numbers=none]
-(Failure Error: Revert)
-  Assertions:
-    (PEq (IsZero TxValue) 0 )
-    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
-\end{lstlisting}};
+%%\node[draw, align=left] at (0,4)
+%\node (pro2) [process, below of=pro1, yshift=0.5cm]
+%{\begin{lstlisting}[numbers=none]
+%(Failure Error: Revert [..])
+%  Assertions:
+%    (PEq (LT 10 (Var "arg1")) 0 )
+%    (PEq TxValue 0 )
+%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
+%\end{lstlisting}};
 
-% ITE node after:
-\node (dec2) [decision, below of=dec1, yshift=0.5cm]
-{\begin{lstlisting}[numbers=none]
-ITE (LT 10 (Var "arg1")) ...
-\end{lstlisting}};
+%% ITE node after:
+%\node (dec3) [decision, below of=dec2, yshift=0.5cm]
+%{\begin{lstlisting}[numbers=none]
+%ITE (LT (Add 1 (Var "arg1")) 10)...
+%\end{lstlisting}};
 
-% left of that:
-%\node[draw, align=left] at (0,4)
-\node (pro2) [process, below of=pro1, yshift=0.5cm]
-{\begin{lstlisting}[numbers=none]
-(Failure Error: Revert [..])
-  Assertions:
-    (PEq (LT 10 (Var "arg1")) 0 )
-    (PEq TxValue 0 )
-    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
-\end{lstlisting}};
+%%left of that:
+%\node (pro3) [process, below of=pro2, yshift=0.5cm]
+%{\begin{lstlisting}[numbers=none]
+%(Failure Error: Revert [...])
+%  Assertions:
+%    ....
+%\end{lstlisting}};
 
-% ITE node after:
-\node (dec3) [decision, below of=dec2, yshift=0.5cm]
-{\begin{lstlisting}[numbers=none]
-ITE (LT (Add 1 (Var "arg1")) 10)...
-\end{lstlisting}};
+%%right of that:
+%%\node[draw] at (8,2)v
+%\node (pro4) [process, below of=dec3, yshift=0.3cm]
+%{\begin{lstlisting}[numbers=none]
+%(Success [...])
+%  Assertions:
+%    (PEq 37470[...] (Keccak (ConcreteBuf [...])))
+%    (PLT (Add 1 (Var "arg1")) 10 )
+%    (PLT 10 (Var "arg1"))
+%    (PEq TxValue 0)
+%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616)
+%\end{lstlisting}};
 
-%left of that:
-\node (pro3) [process, below of=pro2, yshift=0.5cm]
-{\begin{lstlisting}[numbers=none]
-(Failure Error: Revert [...])
-  Assertions:
-    ....
-\end{lstlisting}};
-
-%right of that:
-%\node[draw] at (8,2)v
-\node (pro4) [process, below of=dec3, yshift=0.3cm]
-{\begin{lstlisting}[numbers=none]
-(Success [...])
-  Assertions:
-    (PEq 37470[...] (Keccak (ConcreteBuf [...])))
-    (PLT (Add 1 (Var "arg1")) 10 )
-    (PLT 10 (Var "arg1"))
-    (PEq TxValue 0)
-    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616)
-\end{lstlisting}};
-
-\draw [arrow3] (program) --node[anchor=south] {\tiny Symbolic Interpretation} (dec1);
-\draw [arrow2] (dec1) --node[anchor=north]{False}  (pro1);
-\draw [arrow]  (dec1) --node[anchor=west]{True}   (dec2);
-\draw [arrow2] (dec2) --node[anchor=north]{False}  (pro2);
-\draw [arrow]  (dec2) --node[anchor=west]{True}   (dec3);
-\draw [arrow2] (dec3) --node[anchor=south]{}  (pro3);
-\draw [arrow]  (dec3) --node[anchor=north]{}   (pro4);
-\end{tikzpicture}
-\end{frame}
+%\draw [arrow3] (program) --node[anchor=south] {\tiny Symbolic Interpretation} (dec1);
+%\draw [arrow2] (dec1) --node[anchor=north]{False}  (pro1);
+%\draw [arrow]  (dec1) --node[anchor=west]{True}   (dec2);
+%\draw [arrow2] (dec2) --node[anchor=north]{False}  (pro2);
+%\draw [arrow]  (dec2) --node[anchor=west]{True}   (dec3);
+%\draw [arrow2] (dec3) --node[anchor=south]{}  (pro3);
+%\draw [arrow]  (dec3) --node[anchor=north]{}   (pro4);
+%\end{tikzpicture}
+%\end{frame}
 
  \begin{frame}[fragile=singleslide]{Intermediate Representation: Writes}
  Writing in a buffer is represented as a chain of writes:
