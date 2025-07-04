@@ -5,6 +5,8 @@
 \usepackage{qrcode}
 \usepackage{amsmath}
 \usetheme{CambridgeUS}
+\usepackage{hyperref}
+\newcommand{\bluelink}[2]{\href{#1}{\textcolor{blue}{\textbf{#2}}}}
 
 \usepackage{listings}
 \usepackage{xcolor}
@@ -51,16 +53,16 @@ A gentle introduction to formal verification of Ethereum smart contracts}
 \item PhD from INRIA Grenoble, France
 \item Part-time research at Kuldeep Meel's group, authored::
     \begin{itemize}
-        \item CryptoMiniSat -- SAT solver with XORs
-        \item Ganak\&ApproxMC -- CNF counters
-        \item Arjun -- CNF simplifier
-        \item Bosphorus -- ANF simplifier
-        \item Pepin -- DNF counter
+        \item \textbf{CryptoMiniSat} -- SAT solver with XORs
+        \item \textbf{Ganak\&ApproxMC} -- CNF counters
+        \item \textbf{Arjun} -- CNF simplifier
+        \item \textbf{Bosphorus} -- ANF simplifier
+        \item \textbf{Pepin} -- DNF counter
     \end{itemize}
 \item Worked in IT Security for 10+ years: hacking,
     threat modelling, risk management
 \item Working at Ethereum Foundation, now Argot Collective for the past 3+
-    years
+    years: \textbf{hevm}
 \end{itemize}
 \end{frame}
 
@@ -168,7 +170,7 @@ in a decentralized context. Here, the \textbf{permissionless} and
 \begin{frame}{Let's Explore}
 \begin{itemize}
     \item UniSwap: \url{https://app.uniswap.org/}
-    \item UniSwap Fees Collected: \url{https://dune.com/gammastrategies/Uniswap-v3-Volume-and-Fees-Collected}
+    \item UniSwap Fees Collected: \bluelink{https://dune.com/gammastrategies/Uniswap-v3-Volume-and-Fees-Collected}{dashboard} Dune analytics
     \item AAVE: \url{https://app.aave.com/markets/}
     \item ENS: \url{https://app.ens.domains/}
     \item Gitcoin: \url{https://impact.gitcoin.co/}
@@ -204,8 +206,8 @@ Can be used for:
 
 
 \begin{frame}{Flashloans -- Example}
-Example transaction:
-\url{https://app.blocksec.com/explorer/tx/eth/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a?line=5&debugLine=5}
+Example flashloan transaction via
+\bluelink{https://app.blocksec.com/explorer/tx/eth/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a?line=5&debugLine=5}{BlockSec Explorer}
 \bigskip
 
 Notice:
@@ -218,9 +220,8 @@ Notice:
 \end{itemize}
 \smallskip
 
-Etherscan:
-\url{https://etherscan.io/tx/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a}
-
+Etherscan
+\bluelink{https://etherscan.io/tx/0xe3f0d14cfb6076cabdc9057001c3fafe28767a192e88005bc37bd7d385a1116a}{view of the transaction.}
 Net ``profit'' for the ``attacker'': ~7M USD
 \end{frame}
 
@@ -231,9 +232,9 @@ the sender and receiver addresses are not linked, while still allowing the
 network to verify that the transaction is valid.
 \begin{itemize}
     \item Tornado Cash 0.1
-        ETH: \url{https://etherscan.io/address/0x12d66f87a04a9e220743712ce6d9bb1b5616b8fc}
-    \item Example:
-    \url{https://etherscan.io/tx/0x6d503e39f3a5cfe3736963685d7c49823a8b9de114d74331f4f44b99426cf4d5}
+        ETH \bluelink{https://etherscan.io/address/0x12d66f87a04a9e220743712ce6d9bb1b5616b8fc}{etherscan view}
+    \item Example
+        \bluelink{https://etherscan.io/tx/0x6d503e39f3a5cfe3736963685d7c49823a8b9de114d74331f4f44b99426cf4d5}{transaction}
     $\rightarrow$ Click ``decode input data''
 
 \item ZK proof: verifier can check that prover knows the secret without
@@ -241,6 +242,22 @@ network to verify that the transaction is valid.
 \item Think of it as RSA: you can verify that someone knows the private key
     without them revealing it.
 \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Example: Tornado Cash's Reentrancy Guard}
+Uses a decorator
+\bluelink{https://github.com/tornadocash/tornado-core/blob/master/contracts/Tornado.sol}{ReentracyGuard}
+to prevent reentrancy attacks:
+\bigskip
+
+The actual implementation of the guard is by
+\bluelink{https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/ReentrancyGuard.sol}{openzeppelin}
+\bigskip
+
+Simple solution: \texttt{\_status} variable set to 1/2 depending on whether
+we have entered the function or not. If we try to enter the function again, we
+fail the \texttt{\_status == ENTERED} check, and revert the transaction.
 \end{frame}
 
 \begin{frame}{The Layers of Ethereum}
@@ -259,6 +276,7 @@ network to verify that the transaction is valid.
 The execution layer is the most important for us, as it is where the smart
 contracts are executed.
 \end{frame}
+
 
 
 \section{EVM}
@@ -500,28 +518,27 @@ Built-in:
 \end{itemize}
 \bigskip
 
-Remix URL: \url{https://remix.ethereum.org/}
+\bluelink{https://remix.ethereum.org/}{Remix Online IDE}:
+Load a \bluelink{https://github.com/msooseth/remix-example}{simple Remix GitHub project}
 
-Simple project: \url{https://github.com/msooseth/remix-example}
 Check tests: \texttt{a.complicated(10,9)} could be made to fail.
 
 \end{frame}
 
 \begin{frame}{Remix: The DAO Hack}
 The DAO hack (in 2016) was a major event in Ethereum's history, where an attacker
-exploited a reentrancy vulnerability in the DAO contract to steal \$50 million
+exploited a \textbf{reentrancy vulnerability} in the DAO contract to steal \$50 million
 worth of Ether.
 
 The hack led to a hard fork of Ethereum, creating Ethereum
 Classic (ETC) and Ethereum (ETH).
 \end{frame}
 
-
 \begin{frame}{Remix: The DAO Hack -- part 2}
 Let's recreate the DAO hack in Remix!
 
 \begin{enumerate}
-\item    Load the GitHub repo: \url{https://github.com/msooseth/reentrancy-attack}
+\item    Load \bluelink{https://github.com/msooseth/reentrancy-attack}{this GitHub repo} into Remix
 \item    Compile \& Deploy \textbf{FundRaiser}
 \item    Compile \& Deploy \textbf{Attacker}, with \textbf{FundRaiser} address as parameter
 \item    Set \textbf{Value} to 10000 and call \textbf{deposit} on Fundraiser. This will deposit money on YOUR balance
@@ -594,8 +611,8 @@ Tools in Ethereum:
 
 Why specialized execution engines? Because we need:
 \begin{itemize}
-    \item \textbf{Cheat Codes} -- special functions to manipulate the world
-        state: \url{https://getfoundry.sh/reference/cheatcodes/environment}
+    \item \textbf{Cheat Codes} -- special functions to
+        \bluelink{https://getfoundry.sh/reference/cheatcodes/environment}{manipulate the world state}
     \begin{itemize}
         \item \textbf{deal} -- gives ETH to an address
         \item \textbf{prank} -- changes the sender of the transaction
@@ -709,7 +726,7 @@ Purely symbolic execution-based systems:
 \end{itemize}
 \end{frame}
 
-\section{Our symbolic execution tool: hevm}
+\section{hevm -- EVM Symbolic Execution}
 \begin{frame}{Overview of hevm}
 \begin{itemize}
 \item Started $\approx7$ years ago as part of dapptools, but is now a standalone tool
@@ -767,7 +784,7 @@ Solver finds a satisfying model, e.g., $x = 5$, $y = 0$
 \end{frame}
 
 \begin{frame}[fragile=singleslide]{SMT solver hands-on: z3 in the browser}
-Navigate to: \url{https://jfmc.github.io/z3-play/}
+You can play with \url{https://jfmc.github.io/z3-play/}{z3 in your browser}
 \bigskip
 
 Example bitvector query:
@@ -810,12 +827,12 @@ declarative way, and then prove that the contract satisfies these properties.
 
 \bigskip
 
-Example CVL specification for SQRT approximation over fixed-point numbers:
-\small
-\url{https://github.com/Certora/tutorials-code/tree/master/lesson4_invariants/sqrt}
+Example
+\bluelink{https://github.com/Certora/tutorials-code/tree/master/lesson4_invariants/sqrt}{CVL
+specification} for SQRT approximation over fixed-point numbers.
 \end{frame}
 
-\begin{frame}[fragile=singleslide]{Symbolic Execution: example}
+\begin{frame}[fragile=singleslide]{Symbolic Execution: Example}
 Say your code looks like this:
 \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
 function overflow(uint a) public pure {
@@ -829,7 +846,6 @@ hevm can find the case where $a=0xffffff\ldots$ to trigger the assert due to
 roll-around. hevm gives you the \textbf{exact call to reproduce the bug}. This
 way of using hevm can find a \emph{known-bad state}.
 \end{frame}
-
 
 \begin{frame}[fragile=singleslide]{Symbolic Execution: Invariant Checking}
 You can describe \textbf{invariants} of your contract and write them as
@@ -1199,7 +1215,7 @@ SMT expression:
 % \end{Verbatim}
 \end{frame}
 
-\section{Correctness}
+\section{Correctness of hevm}
 \begin{frame}{How we ensure correctness of hevm}
 \begin{itemize}
     \item Concrete execution checked via eth test suite
@@ -1237,8 +1253,7 @@ SMT expression:
 \end{frame}
 
 \begin{frame}[fragile=singleslide]{Where to find hevm}
-% References:
-hvm repository: \url{https://github.com/ethereum/hevm/}
+hvm repository  \url{https://github.com/ethereum/hevm/}
 
 hevm user guide: \url{https://hevm.dev/}
 \bigskip
@@ -1288,7 +1303,6 @@ All PRs are welcome. Haskell can be a bit intimidating, but it's a very expressi
 % [1] \qrcode[height=0.7cm]{https://github.com/eth-sc-comp/benchmarks/}\qquad  \url{https://github.com/eth-sc-comp/benchmarks/}
 % \end{frame}
 
-\section{Conclusions}
 \begin{frame}[fragile=singleslide]{Limitations \& Future Work}
 hevm has a number of inherent limitations:
 
@@ -1307,25 +1321,25 @@ Future work:
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile=singleslide]{Conclusions}
-hevm is a fully-featured, easy-to-use tool that can help find bugs in EVM
-bytecode. Its sophisticated IR is tailored to the EVM via Keccak- and
-array/map-specific rewrites to lower the complexity of solving the final SMT
-expression.
-\bigskip
-
-%Download hevm from \url{https://github.com/ethereum/hevm/releases}
-%\bigskip
-%\qrcode{https://github.com/ethereum/hevm/releases}
-
+\begin{frame}[fragile=singleslide]{Quick Start Guide}
 Development environment:
 \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
 sh <(curl -L https://nixos.org/nix/install) --daemon
 git clone https://github.com/ethereum/hevm/
+cd hevm
 nix-shell
-cabal repl test
-[...]
-> :main
+\end{Verbatim}
+
+You now have in the shell:
+\begin{itemize}
+    \item hevm via cabal: \texttt{cabal run exe:hevm -- test/symbolic/equivalance}
+    \item SMT solvers: Z3, bitwuzla, cvc5
+    \item Ethereum development environment: solc, geth, evm, forge
+\end{itemize}
+\bigskip
+
+\begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\footnotesize]
+cabal run exe:hevm -- symbolic --create --code "60806040523480..."
 \end{Verbatim}
 \end{frame}
 
