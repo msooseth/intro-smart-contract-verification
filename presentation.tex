@@ -941,7 +941,7 @@ Limitations:
 \end{frame}
 
 
-\begin{frame}[fragile=singleslide]{Intermediate Representation}
+\begin{frame}[fragile=singleslide]{Intermediate Representation: Code to Expression}
 \small
 Through the symbolic execution engine we create an expression that captures all
 end-states. We then take each end-state out and filter it for things we are
@@ -949,9 +949,9 @@ looking for, e.g. assertion failures. Let's take the example:
 
 \begin{Verbatim}[frame=single, framerule=0.2mm,framesep=2mm,fontsize=\small]
 function overflow(uint a) public pure {
-	uint b;
-	unchecked { b = a + 1;}
-	assert(b > a);
+    uint b;
+    unchecked { b = a + 1;}
+    assert(b > a);
 }
 \end{Verbatim}
 
@@ -963,7 +963,7 @@ PLEq (Add (Var "a") (Lit 1)) (Var "a")
 Notice: we use less-or-equal, because we want a \textbf{counterexample}
 \end{frame}
 
-\begin{frame}[fragile=singleslide]{Intermediate Representation}
+\begin{frame}[fragile=singleslide]{Intermediate Representation: Graph of Expressions}
 \centering
 \includegraphics[scale=0.85]{IR}
 \end{frame}
