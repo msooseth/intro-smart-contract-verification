@@ -7,6 +7,7 @@
 \usetheme{CambridgeUS}
 \usepackage{hyperref}
 \newcommand{\bluelink}[2]{\href{#1}{\textcolor{blue}{\textbf{#2}}}}
+\usepackage{fancyvrb}
 
 \usepackage{listings}
 \usepackage{xcolor}
@@ -29,9 +30,9 @@
     breaklines=true,
 }
 
-\tikzstyle{process} = [rectangle, minimum width=3cm, text centered, draw=black, fill=orange!30]
+\tikzstyle{process}  = [rectangle, minimum width=3cm, text centered, draw=black, fill=orange!30]
 \tikzstyle{decision} = [rectangle, minimum width=3cm, text centered, draw=black, fill=green!30]
-\tikzstyle{code} = [rectangle, minimum width=3cm, text centered, draw=black, fill=yellow!20]
+\tikzstyle{code}     = [rectangle, minimum width=3cm, text centered, draw=black, fill=yellow!20]
 \tikzstyle{arrow} = [thick,->,>=stealth]
 \tikzstyle{arrow2} = [thick, dashed, ->,>=stealth]
 \tikzstyle{arrow3} = [thick, ->, draw=blue]
@@ -558,29 +559,34 @@ Let's recreate the DAO hack in Remix!
 
 \section{Testing and Verification}
 \begin{frame}{What is a bug anyway?}
-
 EVM:
 \begin{itemize}
     \item Steal the money due to e.g. overflow/reentrancy/logical error/etc bug
     \item Lock in the money due to liveness issues
     \item Exploit incorrect rounding in online exchanges to drain contract
-    \item Borrow money to buy some asset, dump it in an automated market maker pushing its price to zero, then buy everything for zero.
+    \item Borrow money to buy some asset, dump it in an automated market maker
+        pushing its price to zero, then buy everything for zero.
 \end{itemize}
 
 Consensus:
 \begin{itemize}
-    \item Frontrunning: observe a money-making transaction, replace the
+    \item \bluelink{https://arxiv.org/pdf/1904.05234}{Frontrunning}:
+        observe a money-making transaction, replace the
         recipient of the transaction with my own address
-    \item
-        \bluelink{https://etherscan.io/tx/0xee9fcd2b9996e96b642cb4cda47fc140f98fdaf07ee02657743d4bfcc4670106}{Sandwiching}: see someone is buying an asset, buy a lot of
+    \item \bluelink{https://etherscan.io/tx/0xee9fcd2b9996e96b642cb4cda47fc140f98fdaf07ee02657743d4bfcc4670106}{Sandwiching}:
+        see someone is buying an asset, buy a lot of
     the asset before their transaction is executed, then sell it all off
     later for a higher price. Block is
     \bluelink{https://etherscan.io/txs?block=22029771}{here}, observe the \texttt{MEV Bot}
     before and after the \texttt{0xee9fc} transaction.
+    (\bluelink{https://x.com/nikokampouris/status/1899914224484147661}{X
+    thread}, \bluelink{https://zeromev.org/block?num=13640275}{another} example)
 \end{itemize}
 
 \bigskip
-Some of these are ''clearly`` bugs. Some of them are abuse of systems(frontrunning). Some are games played according to the rules, but perhaps not according to the spirit.
+Some of these are ''clearly`` bugs. Some of them are abuse of
+systems(frontrunning). Some are games played according to the rules, but
+perhaps not according to the spirit.
 \end{frame}
 
 \begin{frame}{The Testing Pyramid}
@@ -950,7 +956,6 @@ function overflow(uint a) public pure {
 \end{Verbatim}
 
 The expression to generate a counterexamle for this could look like:
-
 \begin{Verbatim}[frame=single, framerule=0.2mm, framesep=2mm,fontsize=\small]
 PLEq (Add (Var "a") (Lit 1)) (Var "a")
 \end{Verbatim}
@@ -958,94 +963,10 @@ PLEq (Add (Var "a") (Lit 1)) (Var "a")
 Notice: we use less-or-equal, because we want a \textbf{counterexample}
 \end{frame}
 
-
-%\begin{frame}[fragile=singleslide]{Intermediate Representation}
-
-%\begin{tikzpicture}[node distance=2cm]
-%\centering
-%\tiny
-%%ITE node
-
-%%the source code
-%\node (program) [text width=27em, code]
-%{\begin{lstlisting}[numbers=none]
-%contract MyContract {
-%  mapping(uint => uint) items;
-%  function test(uint val1) public {
-%    require(val1 > 10);
-%    unchecked {
-%      items[4] = val1+1;
-%      assert(items[4] > 10); } } }
-%\end{lstlisting}
-%};
-
-%\node (dec1) [right of=program, xshift=6.5cm, decision]
-%{\begin{lstlisting}[numbers=none]
-%(ITE (IsZero TxValue)) ...
-%\end{lstlisting}};
-
-%%% left of that:
-%\node (pro1) [process, below of=program, yshift=0.3cm]
-%{\begin{lstlisting}[numbers=none]
-%(Failure Error: Revert)
-%  Assertions:
-%    (PEq (IsZero TxValue) 0 )
-%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
-%\end{lstlisting}};
-
-%% ITE node after:
-%\node (dec2) [decision, below of=dec1, yshift=0.5cm]
-%{\begin{lstlisting}[numbers=none]
-%ITE (LT 10 (Var "arg1")) ...
-%\end{lstlisting}};
-
-%% left of that:
-%%\node[draw, align=left] at (0,4)
-%\node (pro2) [process, below of=pro1, yshift=0.5cm]
-%{\begin{lstlisting}[numbers=none]
-%(Failure Error: Revert [..])
-%  Assertions:
-%    (PEq (LT 10 (Var "arg1")) 0 )
-%    (PEq TxValue 0 )
-%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616 )
-%\end{lstlisting}};
-
-%% ITE node after:
-%\node (dec3) [decision, below of=dec2, yshift=0.5cm]
-%{\begin{lstlisting}[numbers=none]
-%ITE (LT (Add 1 (Var "arg1")) 10)...
-%\end{lstlisting}};
-
-%%left of that:
-%\node (pro3) [process, below of=pro2, yshift=0.5cm]
-%{\begin{lstlisting}[numbers=none]
-%(Failure Error: Revert [...])
-%  Assertions:
-%    ....
-%\end{lstlisting}};
-
-%%right of that:
-%%\node[draw] at (8,2)v
-%\node (pro4) [process, below of=dec3, yshift=0.3cm]
-%{\begin{lstlisting}[numbers=none]
-%(Success [...])
-%  Assertions:
-%    (PEq 37470[...] (Keccak (ConcreteBuf [...])))
-%    (PLT (Add 1 (Var "arg1")) 10 )
-%    (PLT 10 (Var "arg1"))
-%    (PEq TxValue 0)
-%    (PLT (BufLength (AbstractBuf "txdata")) 18446744073709551616)
-%\end{lstlisting}};
-
-%\draw [arrow3] (program) --node[anchor=south] {\tiny Symbolic Interpretation} (dec1);
-%\draw [arrow2] (dec1) --node[anchor=north]{False}  (pro1);
-%\draw [arrow]  (dec1) --node[anchor=west]{True}   (dec2);
-%\draw [arrow2] (dec2) --node[anchor=north]{False}  (pro2);
-%\draw [arrow]  (dec2) --node[anchor=west]{True}   (dec3);
-%\draw [arrow2] (dec3) --node[anchor=south]{}  (pro3);
-%\draw [arrow]  (dec3) --node[anchor=north]{}   (pro4);
-%\end{tikzpicture}
-%\end{frame}
+\begin{frame}[fragile=singleslide]{Intermediate Representation}
+\centering
+\includegraphics[scale=0.85]{IR}
+\end{frame}
 
  \begin{frame}[fragile=singleslide]{Intermediate Representation: Writes}
  Writing in a buffer is represented as a chain of writes:
